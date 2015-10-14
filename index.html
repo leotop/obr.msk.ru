@@ -4,12 +4,59 @@
 	<meta charset="UTF-8">
 	<title>Школы Москвы</title>
 	<link rel="stylesheet" href="vendor/css/bootstrap.css">
+
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<meta property="og:title" content="Сравнение московских школ по результатам ЕГЭ и ГИА."/>
+	<meta property="og:type" content="website"/>
+	<meta property="og:site_name" content="Московские школы"/>
+	<meta property="og:url" content="http://obr.msk.ru/"/>
+	<meta property="og:description" content="Выбор школы для ребёнка часто совершается нерационально. Сейчас существуют показатели общие для всех школ: ЕГЭ, ГИА, доля учеников, поступающих в лучшие университеты. Можно учитывать их при выборе школы."/>
+	<meta property="og:image" content="http://obr.msk.ru/bars.png"/>
+
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:site" content="Московские школы">
+	<meta name="twitter:title" content="Сравнение московских школ по результатам ЕГЭ и ГИА.">
+	<meta name="twitter:description" content="Выбор школы для ребёнка часто совершается нерационально. Сейчас существуют показатели общие для всех школ: ЕГЭ, ГИА, доля учеников, поступающих в лучшие университеты. Можно учитывать их при выборе школы.">
+	<meta name="twitter:image:src" content="http://obr.msk.ru/bars.png">
+
+	<script src="http://yastatic.net/jquery/2.1.4/jquery.min.js" type="text/javascript"></script>
+	<script src="http://yastatic.net/share/share.js" type="text/javascript"></script>
+
+<!-- Yandex.Metrika counter --><script type="text/javascript"> (function (d, w, c) { (w[c] = w[c] || []).push(function() { try { w.yaCounter33036319 = new Ya.Metrika({ id:33036319, clickmap:true, trackLinks:true, accurateTrackBounce:true }); } catch(e) { } }); var n = d.getElementsByTagName("script")[0], s = d.createElement("script"), f = function () { n.parentNode.insertBefore(s, n); }; s.type = "text/javascript"; s.async = true; s.src = "https://mc.yandex.ru/metrika/watch.js"; if (w.opera == "[object Opera]") { d.addEventListener("DOMContentLoaded", f, false); } else { f(); } })(document, window, "yandex_metrika_callbacks");</script><noscript><div><img src="https://mc.yandex.ru/watch/33036319" style="position:absolute; left:-9999px;" alt="" /></div></noscript><!-- /Yandex.Metrika counter -->
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-68850259-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
 </head>
 <body>
 
 <div class="container">
-	<div class="page-header">
-		<h1>Школы Москвы</h1>
+	<h1>Школы Москвы<sup><i> альфа-версия</i></sup></h1>
+	<div id="intro" class="row">
+		<div class="column col-md-6">
+			Выбор школы для ребёнка — это важный вопрос. Часто решение по нему принимается нерационально. Ниже приведены некоторые показатели московских школ, которые могут сделать выбор более качественным. На данные момент информация собрана для топ-300 школ <a href="http://dogm.mos.ru/rating/">по версии Министерства образования</a>. Результаты ЕГЭ всё ещё труднодоступны, поэтому встречаются только у 30% школ.
+		</div>
+		<div class="column col-md-6">
+			Данные частично предоставлены Министерством образования, частично взяты из публичный докладов школ и из социальных сетей. Разработкой занимаются <a href="http://russianschools.ru/">Российские школы</a> и <a href="http://lab.alexkuk.ru/">Лаборатория анализа данных Кукушкина Александра</a>. Адрес для вопросов и комментариев — <a href="mailto:qa@obr.msk.ru">qa@obr.msk.ru</a>.
+			<div id="share"
+			     class="yashare-auto-init"
+			     data-yashareL10n="ru"
+			     data-yashareType="small"
+			     data-yashareQuickServices="vkontakte,facebook,twitter,odnoklassniki,moimir"
+		     	     data-yashareTheme="counter"
+			     data-yashareLink="http://obr.msk.ru/",
+			     data-yashareDescription="Выбор школы для ребёнка — это важные вопрос. Часто решение по нему принимается нерационально. На сайте собраны формальные показатели школ Москвы: ЕГЭ, ГИА, ВУЗы, в которые уходят из школ. Они могут помочь сделать правильный выбор."
+			     data-yashareImage="http://obr.msk.ru/bars.png">
+			</div>
+		</div>
 	</div>
 	<div id="map"></div>
 	<div id="root"></div>

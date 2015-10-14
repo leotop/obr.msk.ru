@@ -51,7 +51,7 @@
 	
 	var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 	
-	var _get = function get(_x, _x2, _x3) { var _again = true; _function: while (_again) { var object = _x, property = _x2, receiver = _x3; desc = parent = getter = undefined; _again = false; if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x = parent; _x2 = property; _x3 = receiver; _again = true; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
+	var _get = function get(_x3, _x4, _x5) { var _again = true; _function: while (_again) { var object = _x3, property = _x4, receiver = _x5; desc = parent = getter = undefined; _again = false; if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { _x3 = parent; _x4 = property; _x5 = receiver; _again = true; continue _function; } } else if ('value' in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } } };
 	
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { 'default': obj }; }
 	
@@ -83,23 +83,39 @@
 	
 	var _dataDataJson2 = _interopRequireDefault(_dataDataJson);
 	
-	var COLORS = ['#a9d2ef', '#92dda8', '#ebbf98', '#cfb6ec', '#c2a8a3'];
+	var COLORS = ['#2e99e5', '#10b141', '#FFCC33', '#666666', '#10b141', '#c86a19', '#c86a19', '#10b141', '#FFCC33', '#2e99e5', '#ebbf98', '#666666', '#666666'];
+	
+	var map = null;
+	
+	var chooseSchoolCallback = function chooseSchoolCallback() {};
+	var hoverCallback = function hoverCallback() {};
+	var onUnHoverCallback = function onUnHoverCallback() {};
+	var distanceCallback = function distanceCallback() {};
 	
 	var state = {
-		schools: _dataDataJson2['default'],
+		schools: _dataDataJson2['default'].map(function (school) {
+			school.distance = 0;
+			return school;
+		}),
 		pinnedSchools: [],
 		sortBy: 'name',
 		sortDirection: 1,
+		selectedSchool: null,
+		selectedSubject: null,
 		subjects: [{ name: 'Русский' }, { name: 'Математика' }, { name: 'Обществознание' }, { name: 'Английский' }, { name: 'Физика' }, { name: 'Биология' }, { name: 'Химия' }, { name: 'Информатика' }, { name: 'История' }, { name: 'Литература' }, { name: 'География' }, { name: 'Французский' }, { name: 'Немецкий' }].map(function (subject, index) {
 			if (!subject.hasOwnProperty('show')) {
-				subject.show = true;
+				if (index < 2) {
+					subject.show = true;
+				} else {
+					subject.show = false;
+				}
 				subject.color = COLORS[index % COLORS.length];
 			}
 			return subject;
 		}),
 		universities: [{ name: 'МГУ' }, { name: 'МГТУ имени Баумана' }, { name: 'РАНХиГС при Президенте РФ' }, { name: 'НИУ ВШЭ' }, { name: 'Финансовый университет' }, { name: 'МФТИ' }, { name: 'МЭИ' }, { name: 'МАИ' }, { name: 'РЭУ имени Плеханова' }, { name: 'Первый МГМУ имени Сеченова' }, { name: 'РУДН' }].map(function (university, index) {
 			if (!university.hasOwnProperty('show')) {
-				university.show = true;
+				university.show = false;
 				university.color = COLORS[index % COLORS.length];
 			}
 			return university;
@@ -120,21 +136,89 @@
 			this.onChangeSort = this.onChangeSort.bind(this);
 			this.onPin = this.onPin.bind(this);
 			this.onUnpin = this.onUnpin.bind(this);
+			this.chooseSchool = this.chooseSchool.bind(this);
+			this.onSelectSchool = this.onSelectSchool.bind(this);
+			this.onSelectSubject = this.onSelectSubject.bind(this);
+			this.onUnselectSchool = this.onUnselectSchool.bind(this);
+			this.onDistanceChanged = this.onDistanceChanged.bind(this);
+			this.onHoverSchool = this.onHoverSchool.bind(this);
+			this.onUnHoverSchool = this.onUnHoverSchool.bind(this);
+	
+			chooseSchoolCallback = this.chooseSchool;
+			hoverCallback = this.onHoverSchool;
+			onUnHoverCallback = this.onUnHoverSchool;
+			distanceCallback = this.onDistanceChanged;
 		}
 	
 		_createClass(Application, [{
+			key: 'onHoverSchool',
+			value: function onHoverSchool(selectedSchool) {
+				this.setState({ selectedSchool: selectedSchool });
+			}
+		}, {
+			key: 'onUnHoverSchool',
+			value: function onUnHoverSchool(school) {
+				this.setState({ selectedSchool: null });
+			}
+		}, {
 			key: 'onPin',
 			value: function onPin(school) {
+				var fromMap = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
+	
 				var schools = this.state.schools.filter(function (item) {
 					return school !== item;
 				});
 				var pinnedSchools = this.state.pinnedSchools;
 				pinnedSchools.push(school);
 				this.setState({ schools: schools, pinnedSchools: pinnedSchools });
+	
+				map.pinSchool(school);
+			}
+		}, {
+			key: 'isSchoolPinned',
+			value: function isSchoolPinned(school) {
+				var fromMap = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
+				var _iteratorNormalCompletion = true;
+				var _didIteratorError = false;
+				var _iteratorError = undefined;
+	
+				try {
+					for (var _iterator = this.state.pinnedSchools[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+						var item = _step.value;
+	
+						if (item === school) {
+							return true;
+						}
+					}
+				} catch (err) {
+					_didIteratorError = true;
+					_iteratorError = err;
+				} finally {
+					try {
+						if (!_iteratorNormalCompletion && _iterator['return']) {
+							_iterator['return']();
+						}
+					} finally {
+						if (_didIteratorError) {
+							throw _iteratorError;
+						}
+					}
+				}
+	
+				return false;
+			}
+		}, {
+			key: 'chooseSchool',
+			value: function chooseSchool(school) {
+				if (this.isSchoolPinned(school)) {
+					this.onUnpin(school, true);
+					return;
+				}
+				this.onPin(school, true);
 			}
 		}, {
 			key: 'onUnpin',
-			value: function onUnpin(school) {
+			value: function onUnpin(school, fromMap) {
 				var schools = this.state.schools;
 				var pinnedSchools = this.state.pinnedSchools.filter(function (item) {
 					return school !== item;
@@ -142,6 +226,35 @@
 				schools.push(school);
 				this.sort(this.state.sortBy, this.state.sortDirection);
 				this.setState({ schools: schools, pinnedSchools: pinnedSchools });
+	
+				map.unPinSchool(school);
+			}
+		}, {
+			key: 'onDistanceChanged',
+			value: function onDistanceChanged(coordinates) {
+				this.calculateDistance(coordinates);
+			}
+		}, {
+			key: 'calculateDistance',
+			value: function calculateDistance(coordinates) {
+				var _this = this;
+	
+				if (!ymaps) {
+					return;
+				}
+				var schools = this.state.schools.map(function (school) {
+					school.distance = _this.calcDistanceForSchool(school, coordinates);
+				});
+				var pinnedSchools = this.state.pinnedSchools.map(function (school) {
+					school.distance = _this.calcDistanceForSchool(school, coordinates);
+				});
+	
+				this.sort(this.state.sortBy, this.state.sortDirection);
+			}
+		}, {
+			key: 'calcDistanceForSchool',
+			value: function calcDistanceForSchool(school, coordinates) {
+				return Number((ymaps.coordSystem.geo.getDistance([school.coordinates.latitude, school.coordinates.longitude], coordinates) / 1000).toFixed(1));
 			}
 		}, {
 			key: 'onChangeSubject',
@@ -153,31 +266,168 @@
 					return subject;
 				});
 	
+				this.calculateAverageExamResults();
+	
 				this.setState({
+					schools: this.state.schools,
+					pinnedSchools: this.state.pinnedSchools,
 					subjects: subjects
 				});
+	
+				if (this.state.sortBy === 'ege' || this.state.sortBy === 'gia') {
+					this.sort(this.state.sortBy, this.state.sortDirection);
+				}
+			}
+		}, {
+			key: 'calculateAverageExamResults',
+			value: function calculateAverageExamResults() {
+				var _this2 = this;
+	
+				var schools = this.state.schools;
+				var pinnedSchools = this.state.pinnedSchools;
+				var shownSubjects = this.getShownSubjects();
+	
+				schools.map(function (school) {
+					school['averageEge'] = _this2.calculateAverageExamResultForSchool(school, 'ege', shownSubjects);
+					school['averageGia'] = _this2.calculateAverageExamResultForSchool(school, 'gia', shownSubjects);
+				});
+	
+				pinnedSchools.map(function (school) {
+					school['averageEge'] = _this2.calculateAverageExamResultForSchool(school, 'ege', shownSubjects);
+					school['averageGia'] = _this2.calculateAverageExamResultForSchool(school, 'gia', shownSubjects);
+				});
+			}
+		}, {
+			key: 'getShownSubjects',
+			value: function getShownSubjects() {
+				return this.state.subjects.filter(function (subject) {
+					return subject.show;
+				});
+			}
+		}, {
+			key: 'getShownUniversities',
+			value: function getShownUniversities() {
+				return this.state.universities.filter(function (item) {
+					return item.show;
+				});
+			}
+		}, {
+			key: 'calculateAverageExamResultForSchool',
+			value: function calculateAverageExamResultForSchool(school, parameter, shownSubjects) {
+				var countOfGrades = 0;
+				var result = shownSubjects.map(function (subject) {
+					if (!school[parameter] || !school[parameter][subject.name] || typeof school[parameter][subject.name].grade === 'undefined') {
+						return 0;
+					}
+					countOfGrades += 1;
+					return school[parameter][subject.name].grade;
+				});
+				if (result.length === 0) {
+					return 0;
+				}
+				result = result.reduce(function (a, b) {
+					return a + b;
+				});
+				if (result !== 0) {
+					result = result / countOfGrades;
+				}
+				return result;
+			}
+		}, {
+			key: 'calculateAverageUniversities',
+			value: function calculateAverageUniversities() {
+				var _this3 = this;
+	
+				var schools = this.state.schools;
+				var pinnedSchools = this.state.pinnedSchools;
+				var shownUniversities = this.getShownUniversities();
+	
+				schools.map(function (school) {
+					school['averageUniversities'] = _this3.calculateAverageUniversityForSchool(school, shownUniversities);
+				});
+	
+				pinnedSchools.map(function (school) {
+					school['averageUniversities'] = _this3.calculateAverageUniversityForSchool(school, shownUniversities);
+				});
+			}
+		}, {
+			key: 'calculateAverageUniversityForSchool',
+			value: function calculateAverageUniversityForSchool(school, shownUniversities) {
+				var count = 0;
+				var result = shownUniversities.map(function (univer) {
+					if (!school.universities || typeof school.universities[univer.name] === 'undefined' || school.universities[univer.name] === null) {
+						return 0;
+					}
+					count += 1;
+					return school.universities[univer.name];
+				});
+				if (result.length === 0) {
+					return 0;
+				}
+				result = result.reduce(function (a, b) {
+					return a + b;
+				});
+				if (result !== 0) {
+					result = result / count;
+				}
+				return result;
 			}
 		}, {
 			key: 'componentDidMount',
 			value: function componentDidMount() {
+				this.calculateAverageExamResults();
+				this.calculateAverageUniversities();
 				this.sort(this.state.sortBy, this.state.sortDirection);
 			}
 		}, {
 			key: 'onChangeSort',
 			value: function onChangeSort(parameter) {
-				var sortDirection = 1;
+				var sortDirection = parameter === 'name' || parameter === 'distance' ? 1 : -1;
 				if (this.state.sortBy === parameter) {
 					sortDirection = -1 * this.state.sortDirection;
 				}
 				this.sort(parameter, sortDirection);
 			}
 		}, {
+			key: 'onSelectSchool',
+			value: function onSelectSchool(selectedSchool) {
+				this.setState({ selectedSchool: selectedSchool });
+				if (!map) {
+					return;
+				}
+				map.selectSchool(selectedSchool);
+			}
+		}, {
+			key: 'onUnselectSchool',
+			value: function onUnselectSchool(school) {
+				this.setState({ selectedSchool: null });
+				if (!map) {
+					return;
+				}
+				map.unSelectSchool(school);
+			}
+		}, {
+			key: 'onSelectSubject',
+			value: function onSelectSubject(selectedSubject) {
+				this.setState({ selectedSubject: selectedSubject });
+			}
+		}, {
 			key: 'sort',
 			value: function sort(sortBy, sortDirection) {
 				var schools = this.state.schools;
+				var sortParam = sortBy;
+				if (sortParam === 'ege') {
+					sortParam = 'averageEge';
+				}
+				if (sortParam === 'gia') {
+					sortParam = 'averageGia';
+				}
+				if (sortParam === 'universities') {
+					sortParam = 'averageUniversities';
+				}
 				schools.sort(function (a, b) {
-					if (a[sortBy] < b[sortBy]) return -1 * sortDirection;
-					if (a[sortBy] > b[sortBy]) return 1 * sortDirection;
+					if (a[sortParam] < b[sortParam]) return -1 * sortDirection;
+					if (a[sortParam] > b[sortParam]) return 1 * sortDirection;
 					return 0;
 				});
 				this.setState({ schools: schools, sortBy: sortBy, sortDirection: sortDirection });
@@ -192,9 +442,17 @@
 					return university;
 				});
 	
+				this.calculateAverageUniversities();
+	
 				this.setState({
+					schools: this.state.schools,
+					pinnedSchools: this.state.pinnedSchools,
 					universities: universities
 				});
+	
+				if (this.state.sortBy === 'ege' || this.state.sortBy === 'gia' || this.state.sortBy === 'universities') {
+					this.sort(this.state.sortBy, this.state.sortDirection);
+				}
 			}
 		}, {
 			key: 'render',
@@ -205,7 +463,12 @@
 					_react2['default'].createElement(
 						_reactBootstrap.Col,
 						{ md: 3 },
-						_react2['default'].createElement(_componentsSubjectFilterJs.SubjectFilter, { subjects: this.state.subjects, onChangeSubject: this.onChangeSubject }),
+						_react2['default'].createElement(_componentsSubjectFilterJs.SubjectFilter, {
+							subjects: this.state.subjects,
+							selectedSubject: this.state.selectedSubject,
+							onChangeSubject: this.onChangeSubject,
+							onSelectSubject: this.onSelectSubject
+						}),
 						_react2['default'].createElement(_componentsUniversityFilterJs.UniversityFilter, { universities: this.state.universities, onChangeUniversity: this.onChangeUniversity })
 					),
 					_react2['default'].createElement(
@@ -218,9 +481,14 @@
 							universities: this.state.universities,
 							sortBy: this.state.sortBy,
 							sortDirection: this.state.sortDirection,
+							selectedSchool: this.state.selectedSchool,
+							selectedSubject: this.state.selectedSubject,
 							onChangeSort: this.onChangeSort,
 							onPin: this.onPin,
-							onUnpin: this.onUnpin
+							onUnpin: this.onUnpin,
+							onSelectSchool: this.onSelectSchool,
+							onSelectSubject: this.onSelectSubject,
+							onUnselectSchool: this.onUnselectSchool
 						})
 					)
 				);
@@ -233,7 +501,8 @@
 	_reactDom2['default'].render(_react2['default'].createElement(Application, null), document.querySelector('#root'));
 	
 	ymaps.ready(function () {
-		new _componentsMapComponentJs.MapComponent();
+		map = new _componentsMapComponentJs.MapComponent();
+		map.drawSchools(_dataDataJson2['default'], chooseSchoolCallback, hoverCallback, onUnHoverCallback, distanceCallback);
 	});
 
 /***/ },
@@ -37146,9 +37415,10 @@
 					_reactBootstrap.ListGroup,
 					null,
 					this.props.subjects.map(function (subject) {
+						var style = { borderLeft: '5px solid ' + subject.color };
 						return _react2['default'].createElement(
 							_reactBootstrap.ListGroupItem,
-							{ key: subject.name, className: 'filter-list', style: { borderLeft: '5px solid ' + subject.color } },
+							{ key: subject.name, className: 'filter-list', style: style },
 							_react2['default'].createElement(_reactBootstrap.Input, { type: 'checkbox', checked: subject.show, onChange: _this.onChange.bind(_this, subject), label: subject.name })
 						);
 					})
@@ -37258,18 +37528,28 @@
 	
 	var _reactBootstrap = __webpack_require__(/*! react-bootstrap */ 158);
 	
+	var COUNT_OF_SCHOOLS = 10;
+	
 	var SchoolTable = (function (_React$Component) {
 		_inherits(SchoolTable, _React$Component);
 	
-		function SchoolTable() {
+		function SchoolTable(props) {
 			_classCallCheck(this, SchoolTable);
 	
-			_get(Object.getPrototypeOf(SchoolTable.prototype), 'constructor', this).apply(this, arguments);
+			_get(Object.getPrototypeOf(SchoolTable.prototype), 'constructor', this).call(this, props);
+			this.state = {
+				showAll: false
+			};
+	
+			this.showMore = this.showMore.bind(this);
+			this.showLess = this.showLess.bind(this);
 		}
 	
 		_createClass(SchoolTable, [{
 			key: 'getResultsForSelectedSubjects',
 			value: function getResultsForSelectedSubjects(results) {
+				var _this = this;
+	
 				var isGia = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
 	
 				if (!results) {
@@ -37288,17 +37568,34 @@
 						return;
 					}
 					if (typeof result.grade === 'undefined' || result.grade === null) {
-						return _react2['default'].createElement('div', { className: 'empty-bar' });
+						return _react2['default'].createElement('div', { key: 'ege-' + result.subject.name + '-' + isGia, className: 'empty-bar' });
 					}
+	
+					var style = { width: isGia ? result.grade * 20 : result.grade + "%" };
+					var numberStyle = {};
+	
+					if (!_this.props.selectedSubject || _this.props.selectedSubject && _this.props.selectedSubject === result.subject) {
+						style['backgroundColor'] = '' + result.subject.color;
+						numberStyle = { color: result.subject.color };
+					}
+	
 					return _react2['default'].createElement(
 						'div',
-						{ className: 'bar' },
+						{ className: 'bar', key: 'ege-' + result.subject.name,
+							onMouseEnter: _this.props.onSelectSubject.bind(_this, result.subject),
+							onMouseLeave: _this.props.onSelectSubject.bind(_this, null)
+						},
 						_react2['default'].createElement(
 							'span',
 							{ className: 'label' },
 							result.subject.name
 						),
-						_react2['default'].createElement('div', { className: 'fill', style: { backgroundColor: result.subject.color, width: isGia ? result.grade * 20 : result.grade } })
+						_react2['default'].createElement('div', { className: 'fill', style: style }),
+						_react2['default'].createElement(
+							'span',
+							{ className: 'number', style: numberStyle },
+							result.grade
+						)
 					);
 				});
 			}
@@ -37316,26 +37613,34 @@
 				}).filter(function (university) {
 					return university !== null;
 				});
-				if (universities.length != 0) {
-					return universities.map(function (university) {
-						if (!university) {
-							return;
-						}
-						if (typeof university.share === 'undefined' || university.share === null) {
-							return _react2['default'].createElement('div', { className: 'empty-bar' });
-						}
-						return _react2['default'].createElement(
-							'div',
-							{ className: 'bar' },
-							_react2['default'].createElement(
-								'span',
-								{ className: 'label' },
-								university.name
-							),
-							_react2['default'].createElement('div', { className: 'fill', style: { backgroundColor: university.color, width: university.share * 100 } })
-						);
+				if (universities.length == 0) {
+					for (var university in top) {
+						universities.push({
+							name: university, color: '#2e99e5', share: top[university]
+						});
+					}
+					universities = universities.sort(function (a, b) {
+						return b.share - a.share;
 					});
 				}
+				return universities.map(function (university) {
+					if (!university) {
+						return;
+					}
+					if (typeof university.share === 'undefined' || university.share === null) {
+						return _react2['default'].createElement('div', { key: 'u-e' + university.name, className: 'empty-bar' });
+					}
+					return _react2['default'].createElement(
+						'div',
+						{ className: 'bar', key: 'u-' + university.name },
+						_react2['default'].createElement(
+							'span',
+							{ className: 'label' },
+							university.name
+						),
+						_react2['default'].createElement('div', { className: 'fill', style: { backgroundColor: university.color, width: university.share * 100 + '%' } })
+					);
+				});
 			}
 		}, {
 			key: 'getSortArrow',
@@ -37349,14 +37654,38 @@
 				return _react2['default'].createElement('span', { className: 'glyphicon glyphicon-chevron-up', 'aria-hidden': 'true' });
 			}
 		}, {
+			key: 'onSelectSchool',
+			value: function onSelectSchool() {}
+		}, {
+			key: 'showMore',
+			value: function showMore() {
+				var _this2 = this;
+	
+				setTimeout(function () {
+					_this2.setState({ showAll: true });
+				}, 0);
+			}
+		}, {
+			key: 'showLess',
+			value: function showLess() {
+				var _this3 = this;
+	
+				setTimeout(function () {
+					_this3.setState({ showAll: false });
+				}, 0);
+			}
+		}, {
 			key: 'getSchoolsTemplate',
 			value: function getSchoolsTemplate(schools) {
-				var _this = this;
+				var _this4 = this;
 	
 				var isPinned = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
 	
 				var len = schools.length - 1;
 				return schools.map(function (school, index) {
+					if (!_this4.state.showAll && !isPinned && index >= COUNT_OF_SCHOOLS) {
+						return null;
+					}
 					var isLast = index === len;
 					var isFirst = index === 0;
 					var classes = "";
@@ -37369,13 +37698,24 @@
 							classes += " last-pinned-school";
 						}
 					}
+					if (_this4.props.selectedSchool === school) {
+						classes += " selected";
+					}
 					return _react2['default'].createElement(
 						'tr',
-						{ key: school.name, className: classes },
+						{ key: school.name, className: classes, onMouseOver: _this4.props.onSelectSchool.bind(_this4, school), onMouseLeave: _this4.props.onUnselectSchool.bind(_this4, school) },
 						_react2['default'].createElement(
 							'td',
 							null,
-							school.name
+							school.name,
+							_react2['default'].createElement('br', null),
+							_react2['default'].createElement(
+								'a',
+								{ href: school.report },
+								'Публичный доклад за ',
+								school.year,
+								' год'
+							)
 						),
 						_react2['default'].createElement(
 							'td',
@@ -37385,19 +37725,24 @@
 						_react2['default'].createElement(
 							'td',
 							null,
-							_this.getResultsForSelectedSubjects(school.ege)
+							_this4.getResultsForSelectedSubjects(school.ege)
 						),
 						_react2['default'].createElement(
 							'td',
 							null,
-							_this.getResultsForSelectedSubjects(school.gia, true)
+							_this4.getResultsForSelectedSubjects(school.gia, true)
 						),
 						_react2['default'].createElement(
 							'td',
 							null,
-							_this.getTopForSelectedUniversities(school.universities)
+							_this4.getTopForSelectedUniversities(school.universities, school)
 						),
-						isPinned ? _this.getPinnedCompareCell(school) : _this.getCompareCell(school)
+						_react2['default'].createElement(
+							'td',
+							null,
+							school.distance
+						),
+						isPinned ? _this4.getPinnedCompareCell(school) : _this4.getCompareCell(school)
 					);
 				});
 			}
@@ -37423,56 +37768,79 @@
 			key: 'render',
 			value: function render() {
 				return _react2['default'].createElement(
-					_reactBootstrap.Table,
-					{ striped: true, bordered: true, condensed: true, hover: true, className: 'school-table' },
+					'div',
+					{ className: 'table-content' },
 					_react2['default'].createElement(
-						'thead',
-						{ className: this.props.pinnedSchools.length > 0 ? 'pinned' : '' },
+						_reactBootstrap.Table,
+						{ condensed: true, hover: true, className: 'school-table' },
 						_react2['default'].createElement(
-							'tr',
-							null,
+							'thead',
+							{ className: this.props.pinnedSchools.length > 0 ? 'pinned' : '' },
 							_react2['default'].createElement(
-								'th',
-								{ className: 'name', onClick: this.props.onChangeSort.bind(this, 'name') },
-								'Школа',
-								this.getSortArrow('name')
-							),
-							_react2['default'].createElement(
-								'th',
-								{ className: 'pupils', onClick: this.props.onChangeSort.bind(this, 'pupils') },
-								'Всего учеников',
-								this.getSortArrow('pupils')
-							),
-							_react2['default'].createElement(
-								'th',
-								{ className: 'ege', onClick: this.props.onChangeSort.bind(this, 'ege') },
-								'ЕГЭ',
-								this.getSortArrow('ege')
-							),
-							_react2['default'].createElement(
-								'th',
-								{ className: 'gia', onClick: this.props.onChangeSort.bind(this, 'gia') },
-								'ГИА',
-								this.getSortArrow('gia')
-							),
-							_react2['default'].createElement(
-								'th',
-								{ className: 'universities', onClick: this.props.onChangeSort.bind(this, 'universities') },
-								'Вузы',
-								this.getSortArrow('universities')
-							),
-							_react2['default'].createElement(
-								'th',
-								{ className: 'compare' },
-								'Сравнить'
+								'tr',
+								null,
+								_react2['default'].createElement(
+									'th',
+									{ className: 'name', onClick: this.props.onChangeSort.bind(this, 'name') },
+									'Школа',
+									this.getSortArrow('name')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'pupils', onClick: this.props.onChangeSort.bind(this, 'pupils') },
+									'Всего учеников',
+									this.getSortArrow('pupils')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'ege', onClick: this.props.onChangeSort.bind(this, 'ege') },
+									'ЕГЭ',
+									this.getSortArrow('ege')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'gia', onClick: this.props.onChangeSort.bind(this, 'gia') },
+									'ГИА',
+									this.getSortArrow('gia')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'universities', onClick: this.props.onChangeSort.bind(this, 'universities') },
+									'Вузы',
+									this.getSortArrow('universities')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'distance', onClick: this.props.onChangeSort.bind(this, 'distance') },
+									'Дистанция (км)',
+									this.getSortArrow('distance')
+								),
+								_react2['default'].createElement(
+									'th',
+									{ className: 'compare' },
+									'Сравнить'
+								)
 							)
+						),
+						_react2['default'].createElement(
+							'tbody',
+							null,
+							this.getSchoolsTemplate(this.props.pinnedSchools, true),
+							this.getSchoolsTemplate(this.props.schools)
 						)
 					),
 					_react2['default'].createElement(
-						'tbody',
-						null,
-						this.getSchoolsTemplate(this.props.pinnedSchools, true),
-						this.getSchoolsTemplate(this.props.schools)
+						'div',
+						{ className: 'load-more-button-container' },
+						this.state.showAll ? _react2['default'].createElement(
+							_reactBootstrap.Button,
+							{ className: 'load-more-button', onClick: this.showLess },
+							'Показать меньше'
+						) : _react2['default'].createElement(
+							_reactBootstrap.Button,
+							{ className: 'load-more-button', onClick: this.showMore },
+							'Показать все'
+						)
 					)
 				);
 			}
@@ -37516,17 +37884,27 @@
 		strokeWidth: 4
 	};
 	
+	var COORDINATES = [55.76, 37.64];
+	
+	exports.COORDINATES = COORDINATES;
+	
 	var MapComponent = (function () {
 		function MapComponent() {
 			_classCallCheck(this, MapComponent);
 	
 			this.map = new ymaps.Map('map', {
-				center: [55.76, 37.64],
+				center: COORDINATES,
 				zoom: 11,
 				controls: ['zoomControl', 'searchControl', 'geolocationControl']
 			});
+			this.schools = {};
+			this.pinnedSchools = {};
+			this.map.behaviors.disable('scrollZoom');
 			this.drawSchool = this.drawSchool.bind(this);
+			this.selectedSchool = null;
 			this.chooseCallback = function () {};
+			this.hoverCallback = function () {};
+			this.distanceCallback = function () {};
 		}
 	
 		_createClass(MapComponent, [{
@@ -37540,19 +37918,66 @@
 					hintContent: school.name
 				}, DEFAULT_STYLE);
 				circle.events.add('mouseenter', function (e) {
+					_this.hoverCallback(school);
 					e.get('target').options.set(ACTIVE_STYLE);
 				}).add('mouseleave', function (e) {
+					_this.unHoverCallback(school);
+					if (_this.pinnedSchools[school.name]) {
+						return;
+					}
 					e.get('target').options.set(DEFAULT_STYLE);
 				}).add("click", function (e) {
 					_this.chooseCallback(school);
 				});
+				this.schools[school.name] = circle;
 				this.map.geoObjects.add(circle);
 			}
 		}, {
+			key: "selectSchool",
+			value: function selectSchool(school) {
+				this.selectedSchool = school;
+				this.schools[school.name].options.set(ACTIVE_STYLE);
+			}
+		}, {
+			key: "unSelectSchool",
+			value: function unSelectSchool(school) {
+				var selectedSchool = this.selectedSchool;
+				this.selectedSchool = null;
+				if (this.pinnedSchools[school.name]) {
+					return;
+				}
+				this.schools[selectedSchool.name].options.set(DEFAULT_STYLE);
+			}
+		}, {
+			key: "pinSchool",
+			value: function pinSchool(school) {
+				this.pinnedSchools[school.name] = true;
+				this.schools[school.name].options.set(ACTIVE_STYLE);
+			}
+		}, {
+			key: "unPinSchool",
+			value: function unPinSchool(school) {
+				delete this.pinnedSchools[school.name];
+				this.schools[school.name].options.set(DEFAULT_STYLE);
+			}
+		}, {
 			key: "drawSchools",
-			value: function drawSchools(schools, chooseCallback) {
-				schools.forEach(this.drawSchool);
+			value: function drawSchools(schools, chooseCallback, hoverCallback, unHoverCallback, distanceCallback) {
+				var _this2 = this;
+	
 				this.chooseCallback = chooseCallback;
+				this.hoverCallback = hoverCallback;
+				this.unHoverCallback = unHoverCallback;
+				this.distanceCallback = distanceCallback;
+				schools.forEach(this.drawSchool);
+	
+				this.map.events.add('boundschange', function (e) {
+					setTimeout(function () {
+						_this2.distanceCallback(_this2.map.getCenter());
+					}, 1);
+				});
+	
+				distanceCallback(this.map.getCenter());
 			}
 		}]);
 	
@@ -37602,7 +38027,7 @@
 	
 	
 	// module
-	exports.push([module.id, ".page-header {\n\ttext-align: center;\n}\n.filter-list {\n\tpadding: 0 15px;\n}\n#map {\n\twidth: 100%;\n\theight: 300px;\n\tmargin-bottom: 1em;\n}\n.school-table th .glyphicon {\n\tright: 0;\n\tfloat: right;\n}\n.school-table th {\n\tcursor: pointer;\n}\n.school-table th:hover {\n\tbackground-color: #f5f5f5;\n}\n.school-table thead.pinned > tr > th {\n\tborder-bottom: 2px solid black;\n}\n.pin-cell {\n\tcursor: pointer;\n\ttext-align: center;\n}\ntr.pinned-school {\n\tborder-left: 2px solid black;\n\tborder-right: 2px solid black;\n}\ntr.first-pinned-school {\n\tborder-top: 2px solid black;\n}\ntr.last-pinned-school {\n\tborder-bottom: 2px solid black;\n}\nth.ege {\n\twidth: 120px;\n}\nth.gia {\n\twidth: 120px;\n}\n\n.empty-bar {\n\theight: 15px;\n}\n.bar {\n    height: 15px;\n    line-height: 15px;\n    position: relative;\n    margin-bottom: 1px;\n    background: rgba(0,0,0,0.02)\n}\n\n.bar .label {\n    font-family: 'Arial', sans-serif;\n    font-style: normal;\n    color: rgba(255,255,255,0.85);\n    padding-left: 3px;\n    z-index: 40;\n    position: absolute;\n}\n\n.bar .fill {\n    left: 0;\n    top: 0;\n    bottom: 0;\n    z-index: 30;\n    background-color: #2e99e5;\n    position: absolute;\n}", ""]);
+	exports.push([module.id, "* {\n    font-family: sans-serif;\n    font-size: 14px;\n    line-height: 1.5;\n    letter-spacing: .01em;\n}\nh1 {\n    letter-spacing: -0.04em;\n}\n#intro {\n    margin-bottom: 1.5em;\n}\n.filter-list {\n\tpadding: 0 5px;\n}\n#map {\n\twidth: 100%;\n\theight: 300px;\n\tmargin-bottom: 1em;\n}\n.list-group-item {\n    border: none;\n    margin: -10px;\n}\n.school-table th .glyphicon {\n\tright: 0;\n\tfloat: right;\n}\n.school-table th {\n\tcursor: pointer;\n}\n.school-table th:hover {\n\tbackground-color: #f5f5f5;\n}\n.school-table thead.pinned > tr > th {\n\tborder-bottom: 2px solid black;\n}\n.pin-cell {\n\tcursor: pointer;\n\ttext-align: center;\n\tvertical-align: middle!important;\n}\n.pin-cell:hover {\n\tcolor: lightslategray;\n}\ntr.pinned-school {\n    background-color: #f9f9f9;\n}\ntr.last-pinned-school {\n    border-bottom: 2px solid black;\n}\ntr.selected {\n\tbackground-color: #f5f5f5;\n}\ntbody tr.selected, tbody tr:hover {\n\t/*border-left: 2px solid darkblue;*/\n\t/*border-right: 2px solid darkblue;*/\n}\nth.ege {\n\twidth: 23%;\n}\nth.gia {\n\twidth: 23%;\n}\nth.name {\n\twidth: 15%;\n}\nth.pupils {\n\twidth: 5%;\n}\nth.universities {\n\twidth: 23%;\n}\nth.compare {\n\twidth: 5%;\n}\n.empty-bar {\n\theight: 15px;\n}\n.bar {\n    height: 15px;\n    line-height: 15px;\n    position: relative;\n    margin-bottom: 1px;\n    background: rgba(0,0,0,0.02);\n}\n\n.bar .label {\n\tcursor: pointer;\n    font-family: 'Arial', sans-serif;\n    font-style: normal;\n    color: rgba(255,255,255,0.85);\n    padding-left: 3px;\n    z-index: 40;\n    position: absolute;\n}\n\n.bar .fill {\n\tcursor: pointer;\n    left: 0;\n    top: 0;\n    bottom: 0;\n    z-index: 30;\n    background-color: rgba(211, 211, 211, 0.18);\n    position: absolute;\n}\n\n.bar .number {\n\tcursor: pointer;\n    right: 0;\n    top: 0;\n    bottom: 0;\n    z-index: 30;\n    position: absolute;\n    font-weight: bold;\n    font-size: 11px;\n\tcolor: rgba(211, 211, 211, 0.18);\n}\n.load-more-button-container {\n\ttext-align: center;\n}\n.load-more-button {\n\tmargin-top: 1em;\n\tmargin-bottom: 1em;\n}", ""]);
 	
 	// exports
 
@@ -37901,5438 +38326,7 @@
   \*************************/
 /***/ function(module, exports) {
 
-	"use strict";
-	
-	module.exports = [{
-		"universities": {
-			"Финансовый университет": 0.01834862385321101,
-			"МФТИ": 0.022935779816513763,
-			"РАНХиГС при Президенте РФ": 0.027522935779816515,
-			"МГУ": 0.5229357798165137,
-			"НИУ ВШЭ": 0.11926605504587157
-		},
-		"pupils": 1396,
-		"coordinates": {
-			"latitude": 55.748615,
-			"longitude": 37.604987
-		},
-		"gia": {
-			"Математика": {
-				"grade": 4.7,
-				"pupils": 112
-			},
-			"Русский": {
-				"grade": 4.5,
-				"pupils": 112
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 68,
-				"pupils": null
-			},
-			"История": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 78,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 90,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 77,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 78,
-				"pupils": null
-			},
-			"География": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 80,
-				"pupils": null
-			}
-		},
-		"name": "Пятьдесят седьмая школа"
-	}, {
-		"universities": {
-			"МГТУ Станкин": 0.04,
-			"МАИ": 0.05333333333333334,
-			"МГУ": 0.18666666666666668,
-			"МГТУ МИРЭА": 0.04,
-			"МГТУ имени Баумана": 0.16
-		},
-		"pupils": 3356,
-		"coordinates": {
-			"latitude": 55.787705,
-			"longitude": 37.595761
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.0519480519480515,
-				"pupils": 77
-			},
-			"Обществознание": {
-				"grade": 3.734375,
-				"pupils": 64
-			},
-			"Биология": {
-				"grade": 4.04054054054054,
-				"pupils": 74
-			},
-			"Английский": {
-				"grade": 4.354838709677419,
-				"pupils": 31
-			},
-			"Химия": {
-				"grade": 4.341463414634147,
-				"pupils": 82
-			},
-			"Французский": {
-				"grade": 4.133333333333334,
-				"pupils": 15
-			},
-			"Математика": {
-				"grade": 4.06,
-				"pupils": 350
-			},
-			"Информатика": {
-				"grade": 4.4,
-				"pupils": 30
-			},
-			"География": {
-				"grade": 4.090909090909091,
-				"pupils": 11
-			},
-			"Немецкий": {
-				"grade": 4.25,
-				"pupils": 40
-			},
-			"Русский": {
-				"grade": 4.142857142857143,
-				"pupils": 350
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 62,
-				"pupils": 80
-			},
-			"Обществознание": {
-				"grade": 62,
-				"pupils": 96
-			},
-			"История": {
-				"grade": 56,
-				"pupils": 34
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": 125
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": 45
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": 115
-			},
-			"Литература": {
-				"grade": 64,
-				"pupils": 14
-			},
-			"Французский": {
-				"grade": 78,
-				"pupils": 19
-			},
-			"Математика": {
-				"grade": 59,
-				"pupils": 219
-			},
-			"Информатика": {
-				"grade": 64,
-				"pupils": 38
-			},
-			"География": {
-				"grade": 76,
-				"pupils": 2
-			},
-			"Немецкий": {
-				"grade": 74,
-				"pupils": 20
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": 331
-			}
-		},
-		"name": "Многопрофильный лицей №1501"
-	}, {
-		"universities": {
-			"РАНХиГС при Президенте РФ": 0.02408256880733945,
-			"Финансовый университет": 0.04128440366972477,
-			"АГЗ МЧС России": 0.02408256880733945,
-			"МГУ": 0.5538990825688074,
-			"АПИ при ИГиП РАН": 0.03096330275229358
-		},
-		"pupils": 453,
-		"coordinates": {
-			"latitude": 55.69798,
-			"longitude": 37.556442
-		},
-		"gia": {
-			"Математика": {
-				"grade": 4.921568627450981,
-				"pupils": 102
-			},
-			"Физика": {
-				"grade": 4.53921568627451,
-				"pupils": 102
-			},
-			"Русский": {
-				"grade": 4.705882352941177,
-				"pupils": 102
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 78,
-				"pupils": 64
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": 18
-			},
-			"История": {
-				"grade": 66,
-				"pupils": 4
-			},
-			"Биология": {
-				"grade": 80,
-				"pupils": 2
-			},
-			"Химия": {
-				"grade": 75,
-				"pupils": 4
-			},
-			"Литература": {
-				"grade": 50,
-				"pupils": 2
-			},
-			"Английский": {
-				"grade": 84,
-				"pupils": 10
-			},
-			"Математика": {
-				"grade": 86,
-				"pupils": 79
-			},
-			"Информатика": {
-				"grade": 80,
-				"pupils": 34
-			},
-			"Русский": {
-				"grade": 85,
-				"pupils": 78
-			}
-		},
-		"name": "Вторая школа"
-	}, {
-		"universities": {
-			"РНИМУ имени Пирогова": 0.025,
-			"МФТИ": 0.05,
-			"РАНХиГС при Президенте РФ": 0.05,
-			"МГУ": 0.425,
-			"НИУ ВШЭ": 0.25
-		},
-		"pupils": 279,
-		"coordinates": {
-			"latitude": 55.718253,
-			"longitude": 37.464607
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 77,
-				"pupils": 14
-			},
-			"Обществознание": {
-				"grade": 74,
-				"pupils": 8
-			},
-			"История": {
-				"grade": 77,
-				"pupils": 6
-			},
-			"Биология": {
-				"grade": 86,
-				"pupils": 14
-			},
-			"Химия": {
-				"grade": 83,
-				"pupils": 16
-			},
-			"Литература": {
-				"grade": 69,
-				"pupils": 2
-			},
-			"Математика": {
-				"grade": 68,
-				"pupils": 37
-			},
-			"Информатика": {
-				"grade": 83,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 83,
-				"pupils": 37
-			}
-		},
-		"name": "Школа-интернат "
-	}, {
-		"universities": {
-			"МФТИ": 0.06363636363636363,
-			"НИЯУ МИФИ": 0.02727272727272727,
-			"МГУ": 0.36363636363636365,
-			"НИУ ВШЭ": 0.12727272727272726,
-			"МГТУ имени Баумана": 0.02727272727272727
-		},
-		"pupils": 468,
-		"coordinates": {
-			"latitude": 55.759653,
-			"longitude": 37.614734
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.090909090909091,
-				"pupils": 11
-			},
-			"Биология": {
-				"grade": 5,
-				"pupils": 1
-			},
-			"Химия": {
-				"grade": 3.7096774193548385,
-				"pupils": 31
-			},
-			"Английский": {
-				"grade": 4.555555555555555,
-				"pupils": 9
-			},
-			"Математика": {
-				"grade": 4.696969696969697,
-				"pupils": 99
-			},
-			"Информатика": {
-				"grade": 4.927272727272728,
-				"pupils": 55
-			},
-			"Русский": {
-				"grade": 4.27,
-				"pupils": 100
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 75,
-				"pupils": 65
-			},
-			"Обществознание": {
-				"grade": 66,
-				"pupils": 26
-			},
-			"История": {
-				"grade": 60,
-				"pupils": 8
-			},
-			"Биология": {
-				"grade": 78,
-				"pupils": 10
-			},
-			"Английский": {
-				"grade": 77,
-				"pupils": 30
-			},
-			"Химия": {
-				"grade": 70,
-				"pupils": 10
-			},
-			"Литература": {
-				"grade": 57,
-				"pupils": 4
-			},
-			"Французский": {
-				"grade": 92,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 80,
-				"pupils": 109
-			},
-			"Информатика": {
-				"grade": 81,
-				"pupils": 56
-			},
-			"География": {
-				"grade": 81,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 83,
-				"pupils": 125
-			}
-		},
-		"name": "Школа №179"
-	}, {
-		"universities": {
-			"МФТИ": 0.016835016835016835,
-			"МАИ": 0.013468013468013467,
-			"МГУ": 0.26262626262626265,
-			"МИРЭА": 0.013468013468013467,
-			"МГТУ имени Баумана": 0.494949494949495
-		},
-		"pupils": 1159,
-		"coordinates": {
-			"latitude": 55.641524,
-			"longitude": 37.613018
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 77,
-				"pupils": 348
-			},
-			"Обществознание": {
-				"grade": 69,
-				"pupils": 25
-			},
-			"История": {
-				"grade": 77,
-				"pupils": 4
-			},
-			"Биология": {
-				"grade": 66,
-				"pupils": 8
-			},
-			"Химия": {
-				"grade": 69,
-				"pupils": 9
-			},
-			"Литература": {
-				"grade": 68,
-				"pupils": 1
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": 50
-			},
-			"Математика": {
-				"grade": 79,
-				"pupils": 352
-			},
-			"Информатика": {
-				"grade": 72,
-				"pupils": 144
-			},
-			"География": {
-				"grade": 78,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 82,
-				"pupils": 352
-			}
-		},
-		"name": "Лицей №1580 при МГТУ имени Н.Э.Баумана"
-	}, {
-		"universities": {
-			"МЭСИ": 0.041666666666666664,
-			"МАИ": 0.08333333333333333,
-			"МГУ": 0.4583333333333333,
-			"ВАВТ": 0.041666666666666664,
-			"МГТУ имени Баумана": 0.08333333333333333
-		},
-		"pupils": 463,
-		"coordinates": {
-			"latitude": 55.668935,
-			"longitude": 37.465002
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.2682926829268295,
-				"pupils": 41
-			},
-			"Обществознание": {
-				"grade": 4.153846153846154,
-				"pupils": 13
-			},
-			"Химия": {
-				"grade": 3.5,
-				"pupils": 2
-			},
-			"Литература": {
-				"grade": 3,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 4.150442477876106,
-				"pupils": 113
-			},
-			"Информатика": {
-				"grade": 4.5625,
-				"pupils": 32
-			},
-			"География": {
-				"grade": 5,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 4.06140350877193,
-				"pupils": 114
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 70,
-				"pupils": 6
-			},
-			"Обществознание": {
-				"grade": 70,
-				"pupils": 36
-			},
-			"История": {
-				"grade": 69,
-				"pupils": 9
-			},
-			"Биология": {
-				"grade": 70,
-				"pupils": 7
-			},
-			"Английский": {
-				"grade": 82,
-				"pupils": 30
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": 7
-			},
-			"Литература": {
-				"grade": 72,
-				"pupils": 5
-			},
-			"Французский": {
-				"grade": 94,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 60,
-				"pupils": 72
-			},
-			"Информатика": {
-				"grade": 73,
-				"pupils": 9
-			},
-			"Немецкий": {
-				"grade": 58,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": 72
-			}
-		},
-		"name": "Школа №1329"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.07575757575757576,
-			"Первый МГМУ имени Сеченова": 0.030303030303030304,
-			"Гуманитарный институт": 0.030303030303030304,
-			"МГУ": 0.4090909090909091,
-			"МГТУ имени Баумана": 0.030303030303030304
-		},
-		"pupils": 1868,
-		"coordinates": {
-			"latitude": 55.711584,
-			"longitude": 37.766738
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.5,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 4.3,
-				"pupils": 7
-			},
-			"История": {
-				"grade": 4,
-				"pupils": 2
-			},
-			"Биология": {
-				"grade": 4,
-				"pupils": 5
-			},
-			"Английский": {
-				"grade": 4.9,
-				"pupils": 54
-			},
-			"Химия": {
-				"grade": 4.8,
-				"pupils": 5
-			},
-			"Французский": {
-				"grade": 4,
-				"pupils": 3
-			},
-			"Математика": {
-				"grade": 4,
-				"pupils": 104
-			},
-			"Информатика": {
-				"grade": 4,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 4,
-				"pupils": 104
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 65,
-				"pupils": 11
-			},
-			"Обществознание": {
-				"grade": 73,
-				"pupils": 38
-			},
-			"История": {
-				"grade": 71,
-				"pupils": 10
-			},
-			"Биология": {
-				"grade": 61,
-				"pupils": 14
-			},
-			"Химия": {
-				"grade": 61,
-				"pupils": 11
-			},
-			"Литература": {
-				"grade": 73,
-				"pupils": 6
-			},
-			"Английский": {
-				"grade": 82,
-				"pupils": 38
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": 57
-			},
-			"Информатика": {
-				"grade": 62,
-				"pupils": 12
-			},
-			"Русский": {
-				"grade": 80,
-				"pupils": 77
-			}
-		},
-		"name": "Гимназия на Юго-Востоке"
-	}, {
-		"universities": {
-			"МЭИ": 0.3953488372093023,
-			"РАНХиГС при Президенте РФ": 0.023255813953488372,
-			"МГУ": 0.14534883720930233,
-			"НИУ ВШЭ": 0.029069767441860465,
-			"МГТУ имени Баумана": 0.10465116279069768
-		},
-		"pupils": 1654,
-		"coordinates": {
-			"latitude": 55.760282,
-			"longitude": 37.830204
-		},
-		"gia": {
-			"Математика": {
-				"grade": 4.2,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 4.3,
-				"pupils": null
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Математика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 81,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1502 при МЭИ"
-	}, {
-		"universities": {
-			"РУДН": 0.02857142857142857,
-			"МГИМО": 0.0380952380952381,
-			"МГУ": 0.4857142857142857,
-			"НИУ ВШЭ": 0.12380952380952381,
-			"МГППУ": 0.02857142857142857
-		},
-		"pupils": 669,
-		"coordinates": {
-			"latitude": 55.656016,
-			"longitude": 37.486158
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 74,
-				"pupils": 21
-			},
-			"Обществознание": {
-				"grade": 74,
-				"pupils": 26
-			},
-			"История": {
-				"grade": 77,
-				"pupils": 17
-			},
-			"Биология": {
-				"grade": 85,
-				"pupils": 23
-			},
-			"Английский": {
-				"grade": 84,
-				"pupils": 34
-			},
-			"Химия": {
-				"grade": 83,
-				"pupils": 23
-			},
-			"Литература": {
-				"grade": 67,
-				"pupils": 9
-			},
-			"Французский": {
-				"grade": 80,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 73,
-				"pupils": 75
-			},
-			"Информатика": {
-				"grade": 81,
-				"pupils": 15
-			},
-			"Русский": {
-				"grade": 85,
-				"pupils": 75
-			}
-		},
-		"name": "Гимназия №1543"
-	}, {
-		"universities": {
-			"Первый МГМУ имени Сеченова": 0.02857142857142857,
-			"РАНХиГС при Президенте РФ": 0.02857142857142857,
-			"МГУ": 0.38095238095238093,
-			"НИУ ВШЭ": 0.13333333333333333,
-			"МГТУ имени Баумана": 0.047619047619047616
-		},
-		"pupils": 1046,
-		"coordinates": {
-			"latitude": 55.685056,
-			"longitude": 37.526816
-		},
-		"gia": {
-			"Обществознание": {
-				"grade": 4.315789473684211,
-				"pupils": 19
-			},
-			"История": {
-				"grade": 4.5,
-				"pupils": 2
-			},
-			"Биология": {
-				"grade": 4.625,
-				"pupils": 8
-			},
-			"Химия": {
-				"grade": 4.482758620689655,
-				"pupils": 29
-			},
-			"Литература": {
-				"grade": 4.666666666666667,
-				"pupils": 6
-			},
-			"Английский": {
-				"grade": 4.6521739130434785,
-				"pupils": 69
-			},
-			"Математика": {
-				"grade": 4.4476744186046515,
-				"pupils": 172
-			},
-			"Информатика": {
-				"grade": 4.931818181818182,
-				"pupils": 44
-			},
-			"География": {
-				"grade": 4.666666666666667,
-				"pupils": 18
-			},
-			"Русский": {
-				"grade": 4.794117647058823,
-				"pupils": 102
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 79,
-				"pupils": 27
-			},
-			"Обществознание": {
-				"grade": 76,
-				"pupils": 36
-			},
-			"История": {
-				"grade": 67,
-				"pupils": 25
-			},
-			"Биология": {
-				"grade": 87,
-				"pupils": 6
-			},
-			"Химия": {
-				"grade": 77,
-				"pupils": 8
-			},
-			"Литература": {
-				"grade": 70,
-				"pupils": 10
-			},
-			"Английский": {
-				"grade": 85,
-				"pupils": 8
-			},
-			"Математика": {
-				"grade": 84,
-				"pupils": 63
-			},
-			"Информатика": {
-				"grade": 79,
-				"pupils": 25
-			},
-			"Русский": {
-				"grade": 88,
-				"pupils": 93
-			}
-		},
-		"name": "Гимназия №1514"
-	}, {
-		"universities": {
-			"РАНХиГС при Президенте РФ": 1
-		},
-		"pupils": 2913,
-		"coordinates": {
-			"latitude": 55.744171,
-			"longitude": 37.621435
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Многопрофильный лицей №1799"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.02564102564102564,
-			"МФТИ": 0.23076923076923078,
-			"РЭУ имени Плеханова": 0.02564102564102564,
-			"МГУ": 0.2564102564102564,
-			"ГУЗ": 0.02564102564102564
-		},
-		"pupils": 2448,
-		"coordinates": {
-			"latitude": 55.797194,
-			"longitude": 37.488395
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 54,
-				"pupils": null
-			},
-			"История": {
-				"grade": 52,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": null
-			},
-			"География": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Немецкий": {
-				"grade": 98,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": null
-			}
-		},
-		"name": "Курчатовская школа"
-	}, {
-		"universities": {
-			"РУДН": 0.03314917127071823,
-			"Финансовый университет": 0.03867403314917127,
-			"МГУ": 0.20994475138121546,
-			"НИЯУ МИФИ": 0.04419889502762431,
-			"МГИМО": 0.03314917127071823
-		},
-		"pupils": 1163,
-		"coordinates": {
-			"latitude": 55.601747,
-			"longitude": 37.717115
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 62,
-				"pupils": null
-			},
-			"История": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": null
-			}
-		},
-		"name": "Центр образования №548 "
-	}, {
-		"universities": {
-			"МЭИ": 0.045454545454545456,
-			"МГППУ": 0.030303030303030304,
-			"МГТУ имени Баумана": 0.030303030303030304,
-			"МГУ": 0.45454545454545453,
-			"РХТУ имени Менделеева": 0.045454545454545456
-		},
-		"pupils": 1253,
-		"coordinates": {
-			"latitude": 55.722223,
-			"longitude": 37.57943
-		},
-		"gia": {
-			"Английский": {
-				"grade": 4.3,
-				"pupils": 14
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 56,
-				"pupils": 22
-			},
-			"Обществознание": {
-				"grade": 57,
-				"pupils": 22
-			},
-			"История": {
-				"grade": 53,
-				"pupils": 5
-			},
-			"Биология": {
-				"grade": 71,
-				"pupils": 34
-			},
-			"Химия": {
-				"grade": 70,
-				"pupils": 40
-			},
-			"Литература": {
-				"grade": 67,
-				"pupils": 4
-			},
-			"Английский": {
-				"grade": 66,
-				"pupils": 13
-			},
-			"Математика": {
-				"grade": 52,
-				"pupils": 87
-			},
-			"Информатика": {
-				"grade": 59,
-				"pupils": 11
-			},
-			"География": {
-				"grade": 64,
-				"pupils": 3
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": 87
-			}
-		},
-		"name": "Школа №171"
-	}, {
-		"universities": {
-			"МЭИ": 0.03389830508474576,
-			"МФТИ": 0.0847457627118644,
-			"МГУ": 0.3559322033898305,
-			"РУДН": 0.03389830508474576,
-			"МГТУ имени Баумана": 0.15254237288135594
-		},
-		"pupils": 2229,
-		"coordinates": {
-			"latitude": 55.874511,
-			"longitude": 37.642887
-		},
-		"gia": {
-			"Физика": {
-				"grade": 3.4,
-				"pupils": 9
-			},
-			"Обществознание": {
-				"grade": 3.5,
-				"pupils": 20
-			},
-			"История": {
-				"grade": 4,
-				"pupils": 1
-			},
-			"Биология": {
-				"grade": 4,
-				"pupils": 36
-			},
-			"Химия": {
-				"grade": 3.9,
-				"pupils": 45
-			},
-			"Математика": {
-				"grade": 3.7,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 4.7,
-				"pupils": 3
-			},
-			"География": {
-				"grade": 3,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 4.1,
-				"pupils": null
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Математика": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1568"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.030303030303030304,
-			"НИЯУ МИФИ": 0.06060606060606061,
-			"МГУ": 0.5,
-			"НИУ ВШЭ": 0.06060606060606061,
-			"МГТУ имени Баумана": 0.06060606060606061
-		},
-		"pupils": 489,
-		"coordinates": {
-			"latitude": 55.544749,
-			"longitude": 37.532771
-		},
-		"gia": {
-			"Английский": {
-				"grade": 4.25,
-				"pupils": 8
-			},
-			"Математика": {
-				"grade": 4.948717948717949,
-				"pupils": 78
-			},
-			"Русский": {
-				"grade": 4.717948717948718,
-				"pupils": 78
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 81,
-				"pupils": 36
-			},
-			"Обществознание": {
-				"grade": 65,
-				"pupils": 6
-			},
-			"Английский": {
-				"grade": 70,
-				"pupils": 9
-			},
-			"Математика": {
-				"grade": 85,
-				"pupils": 44
-			},
-			"Информатика": {
-				"grade": 75,
-				"pupils": 23
-			},
-			"Русский": {
-				"grade": 83,
-				"pupils": 44
-			}
-		},
-		"name": "Школа №2007"
-	}, {
-		"universities": {
-			"РГУНГ имени Губкина": 0.029850746268656716,
-			"Финансовый университет": 0.04477611940298507,
-			"МАИ": 0.05970149253731343,
-			"МГУ": 0.3283582089552239,
-			"МГТУ имени Баумана": 0.07462686567164178
-		},
-		"pupils": 2220,
-		"coordinates": {
-			"latitude": 55.859494,
-			"longitude": 37.592923
-		},
-		"gia": {
-			"Обществознание": {
-				"grade": 4.32,
-				"pupils": 25
-			},
-			"Биология": {
-				"grade": 4.285714285714286,
-				"pupils": 7
-			},
-			"Химия": {
-				"grade": 4.583333333333333,
-				"pupils": 12
-			},
-			"Математика": {
-				"grade": 4.085470085470085,
-				"pupils": 117
-			},
-			"Информатика": {
-				"grade": 5,
-				"pupils": 4
-			},
-			"География": {
-				"grade": 5,
-				"pupils": 2
-			},
-			"Русский": {
-				"grade": 4.153225806451613,
-				"pupils": 124
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 67,
-				"pupils": 20
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": 53
-			},
-			"История": {
-				"grade": 62,
-				"pupils": 10
-			},
-			"Биология": {
-				"grade": 64,
-				"pupils": 9
-			},
-			"Химия": {
-				"grade": 59,
-				"pupils": 6
-			},
-			"Литература": {
-				"grade": 53,
-				"pupils": 4
-			},
-			"Английский": {
-				"grade": 80,
-				"pupils": 24
-			},
-			"Математика": {
-				"grade": 56,
-				"pupils": 76
-			},
-			"Информатика": {
-				"grade": 39,
-				"pupils": 10
-			},
-			"География": {
-				"grade": 100,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 75,
-				"pupils": 83
-			}
-		},
-		"name": "Школа №962"
-	}, {
-		"universities": {},
-		"pupils": 1890,
-		"coordinates": {
-			"latitude": 55.998,
-			"longitude": 37.231566
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Математика": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 80,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1557"
-	}, {
-		"universities": {
-			"МГИУ": 0.02564102564102564,
-			"НИТУ МИСиС": 0.02564102564102564,
-			"Финансовый университет": 0.10256410256410256,
-			"МГУ": 0.48717948717948717,
-			"МГТУ имени Баумана": 0.05128205128205128
-		},
-		"pupils": 1805,
-		"coordinates": {
-			"latitude": 55.706741,
-			"longitude": 37.57484
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.2,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 3.4,
-				"pupils": null
-			},
-			"История": {
-				"grade": 3.3,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 4.4,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 4.4,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 4.6,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 4,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 4.6,
-				"pupils": null
-			},
-			"География": {
-				"grade": 4.6,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 4.2,
-				"pupils": null
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 67,
-				"pupils": 36
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": 56
-			},
-			"История": {
-				"grade": 46,
-				"pupils": 30
-			},
-			"Биология": {
-				"grade": 73,
-				"pupils": 38
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": 35
-			},
-			"Литература": {
-				"grade": 56,
-				"pupils": 12
-			},
-			"Английский": {
-				"grade": 68,
-				"pupils": 39
-			},
-			"Математика": {
-				"grade": 60,
-				"pupils": 109
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": 15
-			},
-			"География": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 140
-			}
-		},
-		"name": "Школа №192"
-	}, {
-		"universities": {
-			"МАрхИ": 0.041666666666666664,
-			"МФТИ": 0.05555555555555555,
-			"РЭУ имени Плеханова": 0.027777777777777776,
-			"МГУ": 0.4305555555555556,
-			"НИУ ВШЭ": 0.06944444444444445
-		},
-		"pupils": 903,
-		"coordinates": {
-			"latitude": 55.812003,
-			"longitude": 37.575298
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 4.3,
-				"pupils": null
-			},
-			"История": {
-				"grade": 3.7,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 4.3,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 4.9,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 4.3,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 4.7,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 4.7,
-				"pupils": null
-			},
-			"География": {
-				"grade": 5,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 4.6,
-				"pupils": null
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 74,
-				"pupils": null
-			},
-			"История": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 77,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 80,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 73,
-				"pupils": null
-			},
-			"География": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 85,
-				"pupils": null
-			}
-		},
-		"name": "Школа №218"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.21568627450980393,
-			"Первый МГМУ имени Сеченова": 0.0392156862745098,
-			"МГУ": 0.29411764705882354,
-			"НИУ ВШЭ": 0.0392156862745098,
-			"ФА при Правительстве РФ": 0.0392156862745098
-		},
-		"pupils": 976,
-		"coordinates": {
-			"latitude": 55.803762,
-			"longitude": 37.634577
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 84,
-				"pupils": null
-			},
-			"История": {
-				"grade": 87,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 84,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 86,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1518"
-	}, {
-		"universities": {
-			"МЭИ": 0.05263157894736842,
-			"Финансовый университет": 0.05263157894736842,
-			"РАНХиГС при Президенте РФ": 0.05263157894736842,
-			"МГУ": 0.47368421052631576,
-			"МГИМО": 0.05263157894736842
-		},
-		"pupils": 2182,
-		"coordinates": {
-			"latitude": 55.884822,
-			"longitude": 37.683266
-		},
-		"gia": {
-			"Физика": {
-				"grade": 3.9,
-				"pupils": 12
-			},
-			"Обществознание": {
-				"grade": 3.9,
-				"pupils": 30
-			},
-			"История": {
-				"grade": 3.7,
-				"pupils": 7
-			},
-			"Биология": {
-				"grade": 3.7,
-				"pupils": 19
-			},
-			"Химия": {
-				"grade": 4.2,
-				"pupils": 9
-			},
-			"Литература": {
-				"grade": 5,
-				"pupils": 2
-			},
-			"Английский": {
-				"grade": 3.5,
-				"pupils": 48
-			},
-			"Математика": {
-				"grade": 3.4,
-				"pupils": 194
-			},
-			"Информатика": {
-				"grade": 4.4,
-				"pupils": 5
-			},
-			"География": {
-				"grade": 4.7,
-				"pupils": 7
-			},
-			"Немецкий": {
-				"grade": 4.44,
-				"pupils": 9
-			},
-			"Русский": {
-				"grade": 3.99,
-				"pupils": 194
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 53,
-				"pupils": null
-			},
-			"История": {
-				"grade": 49,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 52,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 57,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 64,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 45,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 56,
-				"pupils": null
-			},
-			"География": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Немецкий": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 68,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1955"
-	}, {
-		"universities": {
-			"МГИМО": 0.05714285714285714,
-			"Первый МГМУ имени Сеченова": 0.05714285714285714,
-			"РЭУ имени Плеханова": 0.04285714285714286,
-			"МГУ": 0.32857142857142857,
-			"РУДН": 0.05714285714285714
-		},
-		"pupils": 1345,
-		"coordinates": {
-			"latitude": 55.734471,
-			"longitude": 37.592096
-		},
-		"gia": {},
-		"year": 2013,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": 8
-			},
-			"Обществознание": {
-				"grade": 72,
-				"pupils": 37
-			},
-			"История": {
-				"grade": 71,
-				"pupils": 10
-			},
-			"Биология": {
-				"grade": 86,
-				"pupils": 97
-			},
-			"Химия": {
-				"grade": 89,
-				"pupils": 97
-			},
-			"Литература": {
-				"grade": 77,
-				"pupils": 6
-			},
-			"Английский": {
-				"grade": 91,
-				"pupils": 50
-			},
-			"Математика": {
-				"grade": 61,
-				"pupils": 143
-			},
-			"Русский": {
-				"grade": 82,
-				"pupils": 143
-			}
-		},
-		"name": "Школа №1253"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.05,
-			"РЭУ имени Плеханова": 0.075,
-			"МГУ": 0.1,
-			"ВАВТ": 0.075,
-			"МГТУ имени Баумана": 0.05
-		},
-		"pupils": 1557,
-		"coordinates": {
-			"latitude": 55.779737,
-			"longitude": 37.596965
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 57,
-				"pupils": 23
-			},
-			"Обществознание": {
-				"grade": 75,
-				"pupils": 46
-			},
-			"История": {
-				"grade": 70,
-				"pupils": 19
-			},
-			"Биология": {
-				"grade": 84,
-				"pupils": 18
-			},
-			"Химия": {
-				"grade": 84,
-				"pupils": 20
-			},
-			"Литература": {
-				"grade": 68,
-				"pupils": 1
-			},
-			"Английский": {
-				"grade": 73,
-				"pupils": 44
-			},
-			"Математика": {
-				"grade": 62,
-				"pupils": 94
-			},
-			"Информатика": {
-				"grade": 67,
-				"pupils": 6
-			},
-			"География": {
-				"grade": 65,
-				"pupils": 2
-			},
-			"Русский": {
-				"grade": 78,
-				"pupils": 94
-			}
-		},
-		"name": "Лицей №1574"
-	}, {
-		"universities": {
-			"ГАСК": 0.06666666666666667,
-			"МНЭПУ": 0.13333333333333333,
-			"Финансовый университет": 0.06666666666666667,
-			"МГУ": 0.4666666666666667,
-			"РГСУ": 0.06666666666666667
-		},
-		"pupils": 2318,
-		"coordinates": {
-			"latitude": 55.976302,
-			"longitude": 37.190765
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 57,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": null
-			},
-			"История": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 78,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 84,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 50,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 51,
-				"pupils": null
-			},
-			"География": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 75,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1528"
-	}, {
-		"universities": {
-			"РГУНГ имени Губкина": 0.030927835051546393,
-			"Финансовый университет": 0.07216494845360824,
-			"МГУ": 0.3711340206185567,
-			"НИУ ВШЭ": 0.041237113402061855,
-			"МГТУ имени Баумана": 0.061855670103092786
-		},
-		"pupils": 2265,
-		"coordinates": {
-			"latitude": 55.685092,
-			"longitude": 37.574327
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": 47
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": 76
-			},
-			"История": {
-				"grade": 50,
-				"pupils": 16
-			},
-			"Биология": {
-				"grade": 70,
-				"pupils": 21
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": 18
-			},
-			"Литература": {
-				"grade": 60,
-				"pupils": 9
-			},
-			"Английский": {
-				"grade": 66,
-				"pupils": 37
-			},
-			"Математика": {
-				"grade": 56,
-				"pupils": 156
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": 15
-			},
-			"География": {
-				"grade": 71,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 154
-			}
-		},
-		"name": "Гимназия №1534"
-	}, {
-		"universities": {},
-		"pupils": 2270,
-		"coordinates": {
-			"latitude": 55.695824,
-			"longitude": 37.551367
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": 44
-			},
-			"Обществознание": {
-				"grade": 63,
-				"pupils": 107
-			},
-			"История": {
-				"grade": 53,
-				"pupils": 32
-			},
-			"Биология": {
-				"grade": 64,
-				"pupils": 34
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": 91
-			},
-			"Химия": {
-				"grade": 63,
-				"pupils": 23
-			},
-			"Литература": {
-				"grade": 58,
-				"pupils": 12
-			},
-			"Французский": {
-				"grade": 77,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 62,
-				"pupils": 220
-			},
-			"Информатика": {
-				"grade": 66,
-				"pupils": 32
-			},
-			"География": {
-				"grade": 63,
-				"pupils": 7
-			},
-			"Немецкий": {
-				"grade": 45,
-				"pupils": 2
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": 220
-			}
-		},
-		"name": "Школа №2086"
-	}, {
-		"universities": {
-			"РГГУ": 0.034482758620689655,
-			"РУДН": 0.034482758620689655,
-			"РАНХиГС при Президенте РФ": 0.04597701149425287,
-			"МГУ": 0.39080459770114945,
-			"НИУ ВШЭ": 0.09195402298850575
-		},
-		"pupils": 700,
-		"coordinates": {
-			"latitude": 55.741409,
-			"longitude": 37.523366
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 73,
-				"pupils": null
-			},
-			"История": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 85,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 78,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 84,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1567"
-	}, {
-		"universities": {},
-		"pupils": 2199,
-		"coordinates": {
-			"latitude": 55.700775,
-			"longitude": 37.744648
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 66,
-				"pupils": 65
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": 90
-			},
-			"История": {
-				"grade": 59,
-				"pupils": 28
-			},
-			"Биология": {
-				"grade": 75,
-				"pupils": 23
-			},
-			"Химия": {
-				"grade": 85,
-				"pupils": 30
-			},
-			"Литература": {
-				"grade": 58,
-				"pupils": 11
-			},
-			"Английский": {
-				"grade": 65,
-				"pupils": 48
-			},
-			"Математика": {
-				"grade": 57,
-				"pupils": 183
-			},
-			"Информатика": {
-				"grade": 79,
-				"pupils": 17
-			},
-			"География": {
-				"grade": 77,
-				"pupils": 9
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": 183
-			}
-		},
-		"name": "Школа №654"
-	}, {
-		"universities": {},
-		"pupils": 1774,
-		"coordinates": {
-			"latitude": 55.640467,
-			"longitude": 37.475701
-		},
-		"gia": {},
-		"year": 2013,
-		"ege": {
-			"Физика": {
-				"grade": 66,
-				"pupils": 7
-			},
-			"Обществознание": {
-				"grade": 69,
-				"pupils": 45
-			},
-			"История": {
-				"grade": 63,
-				"pupils": 19
-			},
-			"Биология": {
-				"grade": 71,
-				"pupils": 10
-			},
-			"Английский": {
-				"grade": 73,
-				"pupils": 30
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": 9
-			},
-			"Литература": {
-				"grade": 58,
-				"pupils": 11
-			},
-			"Французский": {
-				"grade": 95,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 81,
-				"pupils": 3
-			},
-			"География": {
-				"grade": 78,
-				"pupils": 3
-			},
-			"Немецкий": {
-				"grade": 68,
-				"pupils": 6
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": null
-			}
-		},
-		"name": "Школа №109"
-	}, {
-		"universities": {
-			"ВАВТ": 0.058823529411764705,
-			"РАНХиГС при Президенте РФ": 0.058823529411764705,
-			"МГУ": 0.23529411764705882,
-			"НИУ ВШЭ": 0.11764705882352941,
-			"МГЛУ": 0.0784313725490196
-		},
-		"pupils": 830,
-		"coordinates": {
-			"latitude": 55.809975,
-			"longitude": 37.496515
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": 4
-			},
-			"Обществознание": {
-				"grade": 67,
-				"pupils": 25
-			},
-			"История": {
-				"grade": 66,
-				"pupils": 13
-			},
-			"Биология": {
-				"grade": 66,
-				"pupils": 8
-			},
-			"Химия": {
-				"grade": 52,
-				"pupils": 6
-			},
-			"Литература": {
-				"grade": 70,
-				"pupils": 14
-			},
-			"Английский": {
-				"grade": 70,
-				"pupils": 10
-			},
-			"Математика": {
-				"grade": 55,
-				"pupils": 26
-			},
-			"Информатика": {
-				"grade": 62,
-				"pupils": 4
-			},
-			"География": {
-				"grade": 68,
-				"pupils": 2
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": 54
-			}
-		},
-		"name": "Школа №1252 Сервантеса"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.037037037037037035,
-			"РЭУ имени Плеханова": 0.05555555555555555,
-			"МГТУ МИРЭА": 0.037037037037037035,
-			"МГУ": 0.2037037037037037,
-			"ГУУ": 0.037037037037037035
-		},
-		"pupils": 2388,
-		"coordinates": {
-			"latitude": 55.724489,
-			"longitude": 37.635072
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Школа №627"
-	}, {
-		"universities": {
-			"МГИМО": 0.16666666666666666,
-			"Первый МГМУ имени Сеченова": 0.16666666666666666,
-			"РАНХиГС при Президенте РФ": 0.037037037037037035,
-			"МГУ": 0.3148148148148148,
-			"НИУ ВШЭ": 0.05555555555555555
-		},
-		"pupils": 1239,
-		"coordinates": {
-			"latitude": 55.741333,
-			"longitude": 37.603505
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Обществознание": {
-				"grade": 72,
-				"pupils": null
-			},
-			"История": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 83,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 88,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 84,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1529"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.05,
-			"МГУПС": 0.1,
-			"МГУ": 0.4,
-			"МГЮА имени Кутафина": 0.05,
-			"МГТУ имени Баумана": 0.1
-		},
-		"pupils": 1650,
-		"coordinates": {
-			"latitude": 55.864439,
-			"longitude": 37.613485
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 52,
-				"pupils": 31
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": 55
-			},
-			"История": {
-				"grade": 57,
-				"pupils": 19
-			},
-			"Биология": {
-				"grade": 63,
-				"pupils": 16
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": 6
-			},
-			"Литература": {
-				"grade": 71,
-				"pupils": 11
-			},
-			"Английский": {
-				"grade": 63,
-				"pupils": 39
-			},
-			"Математика": {
-				"grade": 51,
-				"pupils": 103
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": 20
-			},
-			"География": {
-				"grade": 64,
-				"pupils": 2
-			},
-			"Немецкий": {
-				"grade": 63,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 103
-			}
-		},
-		"name": "Гимназия №1554"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.03636363636363636,
-			"РЭУ имени Плеханова": 0.07272727272727272,
-			"РАНХиГС при Президенте РФ": 0.07272727272727272,
-			"МГУ": 0.34545454545454546,
-			"ГУУ": 0.03636363636363636
-		},
-		"pupils": 1542,
-		"coordinates": {
-			"latitude": 55.822883,
-			"longitude": 37.529367
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 59,
-				"pupils": null
-			},
-			"История": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"География": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1576"
-	}, {
-		"universities": {
-			"НИТУ МИСиС": 0.029411764705882353,
-			"МАДИ": 0.029411764705882353,
-			"РАНХиГС при Президенте РФ": 0.058823529411764705,
-			"МГУ": 0.38235294117647056,
-			"НИУ ВШЭ": 0.058823529411764705
-		},
-		"pupils": 785,
-		"coordinates": {
-			"latitude": 55.701501,
-			"longitude": 37.84534
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": 4
-			},
-			"Обществознание": {
-				"grade": 70,
-				"pupils": 32
-			},
-			"История": {
-				"grade": 61,
-				"pupils": 14
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": 6
-			},
-			"Химия": {
-				"grade": 65,
-				"pupils": 5
-			},
-			"Литература": {
-				"grade": 63,
-				"pupils": 5
-			},
-			"Английский": {
-				"grade": 82,
-				"pupils": 38
-			},
-			"Математика": {
-				"grade": 53,
-				"pupils": 35
-			},
-			"Русский": {
-				"grade": 82,
-				"pupils": 43
-			}
-		},
-		"name": "Школа №1359 Миля"
-	}, {
-		"universities": {},
-		"pupils": 1739,
-		"coordinates": {
-			"latitude": 55.857457,
-			"longitude": 37.446883
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": null
-			},
-			"История": {
-				"grade": 57,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 51,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"География": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 72,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1571"
-	}, {
-		"universities": {
-			"МГСУ НИУ": 0.08333333333333333,
-			"Первый МГМУ имени Сеченова": 0.05555555555555555,
-			"МГУ": 0.2777777777777778,
-			"МФЮА": 0.05555555555555555,
-			"МГУДТ": 0.027777777777777776
-		},
-		"pupils": 3491,
-		"coordinates": {
-			"latitude": 55.707588,
-			"longitude": 37.823745
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Математика": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1363"
-	}, {
-		"universities": {
-			"НИТУ МИСиС": 0.025,
-			"ГУМФ": 0.05,
-			"МГУ": 0.5,
-			"ГУУ": 0.05,
-			"АГПС МЧС России": 0.05
-		},
-		"pupils": 1650,
-		"coordinates": {
-			"latitude": 55.659805,
-			"longitude": 37.763477
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 51,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 59,
-				"pupils": null
-			},
-			"География": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1357 "
-	}, {
-		"universities": {},
-		"pupils": 936,
-		"coordinates": {
-			"latitude": 55.661928,
-			"longitude": 37.777104
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 57,
-				"pupils": 61
-			},
-			"Обществознание": {
-				"grade": 63,
-				"pupils": 36
-			},
-			"История": {
-				"grade": 59,
-				"pupils": 7
-			},
-			"Биология": {
-				"grade": 67,
-				"pupils": 5
-			},
-			"Химия": {
-				"grade": 59,
-				"pupils": 7
-			},
-			"Литература": {
-				"grade": 51,
-				"pupils": 2
-			},
-			"Английский": {
-				"grade": 62,
-				"pupils": 31
-			},
-			"Математика": {
-				"grade": 63,
-				"pupils": 106
-			},
-			"Информатика": {
-				"grade": 64,
-				"pupils": 17
-			},
-			"География": {
-				"grade": 44,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 106
-			}
-		},
-		"name": "Лицей №1547"
-	}, {
-		"universities": {
-			"МПГУ": 0.028985507246376812,
-			"Финансовый университет": 0.043478260869565216,
-			"РАНХиГС при Президенте РФ": 0.043478260869565216,
-			"МГУ": 0.42028985507246375,
-			"Школа-студия МХАТ": 0.028985507246376812
-		},
-		"pupils": 1080,
-		"coordinates": {
-			"latitude": 55.669194,
-			"longitude": 37.534101
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {},
-		"name": "Школа №117"
-	}, {
-		"universities": {},
-		"pupils": 5309,
-		"coordinates": {
-			"latitude": 55.503058,
-			"longitude": 37.578496
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": 30
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": 71
-			},
-			"История": {
-				"grade": 45,
-				"pupils": 22
-			},
-			"Биология": {
-				"grade": 52,
-				"pupils": 18
-			},
-			"Английский": {
-				"grade": 76,
-				"pupils": 18
-			},
-			"Химия": {
-				"grade": 52,
-				"pupils": 12
-			},
-			"Литература": {
-				"grade": 61,
-				"pupils": 16
-			},
-			"Французский": {
-				"grade": 46,
-				"pupils": 2
-			},
-			"Математика": {
-				"grade": 48,
-				"pupils": 93
-			},
-			"Информатика": {
-				"grade": 65,
-				"pupils": 27
-			},
-			"География": {
-				"grade": 62,
-				"pupils": 6
-			},
-			"Русский": {
-				"grade": 71,
-				"pupils": 141
-			}
-		},
-		"name": "Школа №2109"
-	}, {
-		"universities": {},
-		"pupils": 3009,
-		"coordinates": {
-			"latitude": 55.84674,
-			"longitude": 37.430139
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 55,
-				"pupils": 23
-			},
-			"Обществознание": {
-				"grade": 59,
-				"pupils": 111
-			},
-			"История": {
-				"grade": 48,
-				"pupils": 23
-			},
-			"Биология": {
-				"grade": 58,
-				"pupils": 21
-			},
-			"Химия": {
-				"grade": 71,
-				"pupils": 16
-			},
-			"Литература": {
-				"grade": 57,
-				"pupils": 7
-			},
-			"Английский": {
-				"grade": 61,
-				"pupils": 36
-			},
-			"Математика": {
-				"grade": 49,
-				"pupils": 158
-			},
-			"Информатика": {
-				"grade": 60,
-				"pupils": 19
-			},
-			"География": {
-				"grade": 76,
-				"pupils": 3
-			},
-			"Русский": {
-				"grade": 69,
-				"pupils": 158
-			}
-		},
-		"name": "Школа №2097"
-	}, {
-		"universities": {
-			"РЭУ имени Плеханова": 0.14285714285714285,
-			"МГУ": 0.42857142857142855,
-			"НИУ ВШЭ": 0.2857142857142857,
-			"МГТУ имени Баумана": 0.14285714285714285
-		},
-		"pupils": 4088,
-		"coordinates": {
-			"latitude": 55.895615,
-			"longitude": 37.616207
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": 36
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": 86
-			},
-			"История": {
-				"grade": 53,
-				"pupils": 26
-			},
-			"Биология": {
-				"grade": 61,
-				"pupils": 16
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": 13
-			},
-			"Литература": {
-				"grade": 71,
-				"pupils": 10
-			},
-			"Английский": {
-				"grade": 79,
-				"pupils": 38
-			},
-			"Математика": {
-				"grade": 52,
-				"pupils": 108
-			},
-			"Информатика": {
-				"grade": 63,
-				"pupils": 22
-			},
-			"География": {
-				"grade": 65,
-				"pupils": 6
-			},
-			"Немецкий": {
-				"grade": 80,
-				"pupils": 7
-			},
-			"Русский": {
-				"grade": 72,
-				"pupils": 145
-			}
-		},
-		"name": "Государственная столичная гимназия"
-	}, {
-		"universities": {
-			"РГГУ": 0.05555555555555555,
-			"МФТИ": 0.05555555555555555,
-			"МАИ": 0.05555555555555555,
-			"МГУ": 0.16666666666666666,
-			"МГТУ имени Баумана": 0.05555555555555555
-		},
-		"pupils": 1810,
-		"coordinates": {
-			"latitude": 55.830265,
-			"longitude": 37.360564
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.4,
-				"pupils": 16
-			},
-			"Обществознание": {
-				"grade": 4.2,
-				"pupils": 10
-			},
-			"История": {
-				"grade": 5,
-				"pupils": 1
-			},
-			"Биология": {
-				"grade": 3.7,
-				"pupils": 7
-			},
-			"Химия": {
-				"grade": 4.2,
-				"pupils": 9
-			},
-			"Литература": {
-				"grade": 4.5,
-				"pupils": 4
-			},
-			"Английский": {
-				"grade": 4.3,
-				"pupils": 20
-			},
-			"Математика": {
-				"grade": 3.9,
-				"pupils": 55
-			},
-			"Информатика": {
-				"grade": 4.87,
-				"pupils": 27
-			},
-			"География": {
-				"grade": 4,
-				"pupils": 12
-			},
-			"Русский": {
-				"grade": 3.8,
-				"pupils": 55
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 62,
-				"pupils": 5
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": 20
-			},
-			"История": {
-				"grade": 60,
-				"pupils": 8
-			},
-			"Биология": {
-				"grade": 63,
-				"pupils": 12
-			},
-			"Химия": {
-				"grade": 56,
-				"pupils": 7
-			},
-			"Литература": {
-				"grade": 37,
-				"pupils": 3
-			},
-			"Английский": {
-				"grade": 63,
-				"pupils": 10
-			},
-			"Математика": {
-				"grade": 44,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 46,
-				"pupils": 5
-			},
-			"География": {
-				"grade": 49,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 71,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1564 Белобородова"
-	}, {
-		"universities": {
-			"МГГУ": 0.03278688524590164,
-			"Финансовый университет": 0.03278688524590164,
-			"РАНХиГС при Президенте РФ": 0.04918032786885246,
-			"МГУ": 0.3770491803278688,
-			"МГЛУ": 0.04918032786885246
-		},
-		"pupils": 1490,
-		"coordinates": {
-			"latitude": 55.704443,
-			"longitude": 37.75691
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Школа №641 имени Сергея Есенина"
-	}, {
-		"universities": {
-			"МГУП имени Федорова": 0.046511627906976744,
-			"Первый МГМУ имени Сеченова": 0.046511627906976744,
-			"РАНХиГС при Президенте РФ": 0.046511627906976744,
-			"МГУ": 0.32558139534883723,
-			"МАИ": 0.09302325581395349
-		},
-		"pupils": 1448,
-		"coordinates": {
-			"latitude": 55.871334,
-			"longitude": 37.49064
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Школа №1474"
-	}, {
-		"universities": {
-			"МЭСИ": 0.015625,
-			"Финансовый университет": 0.03125,
-			"МГУ": 0.4765625,
-			"ГУУ": 0.03125,
-			"МАИ": 0.03125
-		},
-		"pupils": 2610,
-		"coordinates": {
-			"latitude": 55.839739,
-			"longitude": 37.381342
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4,
-				"pupils": 11
-			},
-			"Обществознание": {
-				"grade": 4,
-				"pupils": 66
-			},
-			"История": {
-				"grade": 3,
-				"pupils": 1
-			},
-			"Биология": {
-				"grade": 4,
-				"pupils": 19
-			},
-			"Химия": {
-				"grade": 4,
-				"pupils": 19
-			},
-			"Литература": {
-				"grade": 4,
-				"pupils": 9
-			},
-			"Английский": {
-				"grade": 4,
-				"pupils": 34
-			},
-			"Математика": {
-				"grade": 4,
-				"pupils": 198
-			},
-			"Информатика": {
-				"grade": 4,
-				"pupils": 22
-			},
-			"География": {
-				"grade": 4,
-				"pupils": 3
-			},
-			"Русский": {
-				"grade": 4,
-				"pupils": 197
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": 26
-			},
-			"Обществознание": {
-				"grade": 62,
-				"pupils": 103
-			},
-			"История": {
-				"grade": 59,
-				"pupils": 11
-			},
-			"Биология": {
-				"grade": 71,
-				"pupils": 30
-			},
-			"Химия": {
-				"grade": 65,
-				"pupils": 24
-			},
-			"Литература": {
-				"grade": 70,
-				"pupils": 10
-			},
-			"Английский": {
-				"grade": 65,
-				"pupils": 46
-			},
-			"Математика": {
-				"grade": 55,
-				"pupils": 119
-			},
-			"Информатика": {
-				"grade": 61,
-				"pupils": 18
-			},
-			"География": {
-				"grade": 69,
-				"pupils": 6
-			},
-			"Русский": {
-				"grade": 76,
-				"pupils": 168
-			}
-		},
-		"name": "Гимназия №1538"
-	}, {
-		"universities": {
-			"МИЭП": 0.125,
-			"МГУ": 0.625,
-			"НИУ ВШЭ": 0.125,
-			"АМИ": 0.125
-		},
-		"pupils": 3261,
-		"coordinates": {
-			"latitude": 55.760373,
-			"longitude": 37.655634
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Школа №2095 "
-	}, {
-		"universities": {
-			"МГТУ имени Баумана": 0.03773584905660377,
-			"НИЯУ МИФИ": 0.03773584905660377,
-			"МГУ": 0.39622641509433965,
-			"НИУ ВШЭ": 0.05660377358490566,
-			"МГЛУ": 0.03773584905660377
-		},
-		"pupils": 2099,
-		"coordinates": {
-			"latitude": 55.665203,
-			"longitude": 37.751314
-		},
-		"gia": {
-			"Математика": {
-				"grade": 4.4,
-				"pupils": 141
-			},
-			"Русский": {
-				"grade": 4.4,
-				"pupils": 141
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 68,
-				"pupils": 23
-			},
-			"Обществознание": {
-				"grade": 70,
-				"pupils": 55
-			},
-			"История": {
-				"grade": 58,
-				"pupils": 17
-			},
-			"Биология": {
-				"grade": 82,
-				"pupils": 4
-			},
-			"Английский": {
-				"grade": 79,
-				"pupils": 47
-			},
-			"Химия": {
-				"grade": 80,
-				"pupils": 5
-			},
-			"Литература": {
-				"grade": 80,
-				"pupils": 6
-			},
-			"Французский": {
-				"grade": 83,
-				"pupils": 1
-			},
-			"Математика": {
-				"grade": 72,
-				"pupils": 72
-			},
-			"Информатика": {
-				"grade": 71,
-				"pupils": 15
-			},
-			"Русский": {
-				"grade": 86,
-				"pupils": 93
-			}
-		},
-		"name": "Гимназия №1562"
-	}, {
-		"universities": {},
-		"pupils": 368,
-		"coordinates": {
-			"latitude": 55.906582,
-			"longitude": 37.552975
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.1,
-				"pupils": 11
-			},
-			"Обществознание": {
-				"grade": 4.1,
-				"pupils": 42
-			},
-			"Биология": {
-				"grade": 3.8,
-				"pupils": 6
-			},
-			"Химия": {
-				"grade": 5,
-				"pupils": 1
-			},
-			"Литература": {
-				"grade": 4,
-				"pupils": 1
-			},
-			"Английский": {
-				"grade": 4.6,
-				"pupils": 61
-			},
-			"Математика": {
-				"grade": 3.5,
-				"pupils": 114
-			},
-			"Информатика": {
-				"grade": 4.2,
-				"pupils": 9
-			},
-			"География": {
-				"grade": 5,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 3.8,
-				"pupils": 114
-			}
-		},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 52,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": null
-			},
-			"История": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 49,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 49,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 69,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1573"
-	}, {
-		"universities": {
-			"МЭИ": 0.03389830508474576,
-			"НИЯУ МИФИ": 0.03389830508474576,
-			"МГУ": 0.3389830508474576,
-			"НИУ ВШЭ": 0.03389830508474576,
-			"МГТУ имени Баумана": 0.03389830508474576
-		},
-		"pupils": 3336,
-		"coordinates": {
-			"latitude": 55.793905,
-			"longitude": 37.814726
-		},
-		"gia": {
-			"Физика": {
-				"grade": 3.9,
-				"pupils": 29
-			},
-			"Обществознание": {
-				"grade": 3.7,
-				"pupils": 88
-			},
-			"История": {
-				"grade": 3.3,
-				"pupils": 6
-			},
-			"Биология": {
-				"grade": 3.5,
-				"pupils": 23
-			},
-			"Химия": {
-				"grade": 3.9,
-				"pupils": 15
-			},
-			"Литература": {
-				"grade": 4.3,
-				"pupils": 7
-			},
-			"Английский": {
-				"grade": 4,
-				"pupils": 60
-			},
-			"Математика": {
-				"grade": 3.9,
-				"pupils": 282
-			},
-			"Информатика": {
-				"grade": 4.4,
-				"pupils": 38
-			},
-			"География": {
-				"grade": 3.8,
-				"pupils": 5
-			},
-			"Русский": {
-				"grade": 4,
-				"pupils": 282
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 64,
-				"pupils": 1
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": 91
-			},
-			"История": {
-				"grade": 55,
-				"pupils": 29
-			},
-			"Биология": {
-				"grade": 60,
-				"pupils": 35
-			},
-			"Английский": {
-				"grade": 73,
-				"pupils": 34
-			},
-			"Химия": {
-				"grade": 59,
-				"pupils": 31
-			},
-			"Литература": {
-				"grade": 57,
-				"pupils": 17
-			},
-			"Французский": {
-				"grade": 29,
-				"pupils": 58.9
-			},
-			"Математика": {
-				"grade": 50,
-				"pupils": 128
-			},
-			"Информатика": {
-				"grade": 64,
-				"pupils": 11
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 165
-			}
-		},
-		"name": "Гимназия №1811 "
-	}, {
-		"universities": {
-			"Финансовый университет": 0.044444444444444446,
-			"МИТХТ": 0.044444444444444446,
-			"МГУ": 0.3111111111111111,
-			"НИУ ВШЭ": 0.044444444444444446,
-			"БГИИК": 0.022222222222222223
-		},
-		"pupils": 5409,
-		"coordinates": {
-			"latitude": 55.852799,
-			"longitude": 37.642186
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 56,
-				"pupils": null
-			},
-			"История": {
-				"grade": 50,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 64,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"География": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 76,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1565 "
-	}, {
-		"universities": {
-			"МГПУ": 0.0392156862745098,
-			"МФТИ": 0.058823529411764705,
-			"МГУ": 0.23529411764705882,
-			"НИУ ВШЭ": 0.058823529411764705,
-			"МИЭТ": 0.19607843137254902
-		},
-		"pupils": 1748,
-		"coordinates": {
-			"latitude": 55.984975,
-			"longitude": 37.192202
-		},
-		"gia": {
-			"Математика": {
-				"grade": 4,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 4,
-				"pupils": null
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Математика": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": null
-			}
-		},
-		"name": "Школа №853"
-	}, {
-		"universities": {
-			"АГЗ МЧС России": 0.019011406844106463,
-			"Финансовый университет": 0.09505703422053231,
-			"РАНХиГС при Президенте РФ": 0.045627376425855515,
-			"МГУ": 0.5285171102661597,
-			"АПИ при ИГиП РАН": 0.049429657794676805
-		},
-		"pupils": 788,
-		"coordinates": {
-			"latitude": 55.690654,
-			"longitude": 37.579744
-		},
-		"gia": {},
-		"year": 2013,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": 7
-			},
-			"Обществознание": {
-				"grade": 72,
-				"pupils": 28
-			},
-			"История": {
-				"grade": 65,
-				"pupils": 11
-			},
-			"Биология": {
-				"grade": 84,
-				"pupils": 8
-			},
-			"Английский": {
-				"grade": 86,
-				"pupils": 42
-			},
-			"Химия": {
-				"grade": 81,
-				"pupils": 8
-			},
-			"Литература": {
-				"grade": 66,
-				"pupils": 5
-			},
-			"Французский": {
-				"grade": 80,
-				"pupils": 2
-			},
-			"Математика": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 85,
-				"pupils": 3
-			},
-			"Немецкий": {
-				"grade": 57,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 80,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №45 имени Л.И. Мильграма"
-	}, {
-		"universities": {
-			"РГГУ": 0.047619047619047616,
-			"МГИМО": 0.07142857142857142,
-			"МГУ": 0.5,
-			"НИУ ВШЭ": 0.047619047619047616,
-			"МГУПП": 0.047619047619047616
-		},
-		"pupils": 2090,
-		"coordinates": {
-			"latitude": 55.794457,
-			"longitude": 37.793462
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Гимназия №1290"
-	}, {
-		"universities": {},
-		"pupils": 844,
-		"coordinates": {
-			"latitude": 55.760631,
-			"longitude": 37.604906
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": 11
-			},
-			"Обществознание": {
-				"grade": 71,
-				"pupils": 29
-			},
-			"История": {
-				"grade": 60,
-				"pupils": 15
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": 14
-			},
-			"Английский": {
-				"grade": 83,
-				"pupils": 48
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": 15
-			},
-			"Литература": {
-				"grade": 63,
-				"pupils": 10
-			},
-			"Французский": {
-				"grade": 97,
-				"pupils": 2
-			},
-			"Математика": {
-				"grade": 54,
-				"pupils": 47
-			},
-			"Информатика": {
-				"grade": 70,
-				"pupils": 1
-			},
-			"География": {
-				"grade": 89,
-				"pupils": 1
-			},
-			"Немецкий": {
-				"grade": 61,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 78,
-				"pupils": 82
-			}
-		},
-		"name": "Гимназия №1520 имени Капцовых"
-	}, {
-		"universities": {
-			"РГГУ": 0.03773584905660377,
-			"РЭУ имени Плеханова": 0.03773584905660377,
-			"МГМСУ имени Евдокимова": 0.03773584905660377,
-			"МГУ": 0.18867924528301888,
-			"НИУ ВШЭ": 0.05660377358490566
-		},
-		"pupils": 1127,
-		"coordinates": {
-			"latitude": 55.813334,
-			"longitude": 37.568929
-		},
-		"gia": {
-			"Физика": {
-				"grade": 4.333333333333333,
-				"pupils": 3
-			},
-			"Обществознание": {
-				"grade": 4,
-				"pupils": 17
-			},
-			"История": {
-				"grade": 3.5714285714285716,
-				"pupils": 7
-			},
-			"Биология": {
-				"grade": 3.5714285714285716,
-				"pupils": 7
-			},
-			"Химия": {
-				"grade": 4.333333333333333,
-				"pupils": 6
-			},
-			"Литература": {
-				"grade": 4.5,
-				"pupils": 2
-			},
-			"Английский": {
-				"grade": 4.133333333333334,
-				"pupils": 15
-			},
-			"Математика": {
-				"grade": 3.8,
-				"pupils": 80
-			},
-			"География": {
-				"grade": 2,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 4.0476190476190474,
-				"pupils": 84
-			}
-		},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 60,
-				"pupils": null
-			},
-			"История": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 57,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 59,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 45,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 47,
-				"pupils": null
-			},
-			"География": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1454 "
-	}, {
-		"universities": {
-			"МГИУ": 0.08571428571428572,
-			"ИБХ РАН": 0.02857142857142857,
-			"МАДИ": 0.02857142857142857,
-			"МГУ": 0.4,
-			"МАИ": 0.05714285714285714
-		},
-		"pupils": 1063,
-		"coordinates": {
-			"latitude": 55.773727,
-			"longitude": 37.542141
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 49,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": null
-			},
-			"История": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 86,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 50,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 87,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 47,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 60,
-				"pupils": null
-			},
-			"География": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1288 Троян"
-	}, {
-		"universities": {},
-		"pupils": 980,
-		"coordinates": {
-			"latitude": 55.772284,
-			"longitude": 37.626106
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": 28
-			},
-			"Обществознание": {
-				"grade": 54,
-				"pupils": 143
-			},
-			"История": {
-				"grade": 45,
-				"pupils": 35
-			},
-			"Биология": {
-				"grade": 59,
-				"pupils": 10
-			},
-			"Химия": {
-				"grade": 60,
-				"pupils": 7
-			},
-			"Литература": {
-				"grade": 55,
-				"pupils": 115
-			},
-			"Английский": {
-				"grade": 67,
-				"pupils": 95
-			},
-			"Математика": {
-				"grade": 48,
-				"pupils": 298
-			},
-			"Информатика": {
-				"grade": 50,
-				"pupils": 8
-			},
-			"География": {
-				"grade": 65,
-				"pupils": 5
-			},
-			"Немецкий": {
-				"grade": 50,
-				"pupils": 1
-			},
-			"Русский": {
-				"grade": 72,
-				"pupils": 298
-			}
-		},
-		"name": "Школа №2054"
-	}, {
-		"universities": {},
-		"pupils": 2280,
-		"coordinates": {
-			"latitude": 55.842267,
-			"longitude": 37.349722
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 71,
-				"pupils": null
-			},
-			"История": {
-				"grade": 57,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 79,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 78,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 84,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"География": {
-				"grade": 77,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 84,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1944"
-	}, {
-		"universities": {
-			"МПГУ": 0.08108108108108109,
-			"МЭСИ": 0.02702702702702703,
-			"РНИМУ имени Пирогова": 0.05405405405405406,
-			"МГУ": 0.32432432432432434,
-			"ВАВТ": 0.02702702702702703
-		},
-		"pupils": 4902,
-		"coordinates": {
-			"latitude": 55.706543,
-			"longitude": 37.474731
-		},
-		"gia": {},
-		"year": 2013,
-		"ege": {
-			"Физика": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 69,
-				"pupils": null
-			},
-			"История": {
-				"grade": 64,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 79,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 90,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 57,
-				"pupils": null
-			},
-			"География": {
-				"grade": 97,
-				"pupils": null
-			},
-			"Немецкий": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 78,
-				"pupils": null
-			}
-		},
-		"name": "Школа №814"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.03333333333333333,
-			"РАНХиГС при Президенте РФ": 0.05,
-			"МГУ": 0.3,
-			"МГЮА имени Кутафина": 0.03333333333333333,
-			"МГТУ имени Баумана": 0.05
-		},
-		"pupils": 2032,
-		"coordinates": {
-			"latitude": 55.88976,
-			"longitude": 37.6509
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": null
-			},
-			"История": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 88,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 65,
-				"pupils": null
-			},
-			"География": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 78,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1506"
-	}, {
-		"universities": {},
-		"pupils": 3180,
-		"coordinates": {
-			"latitude": 55.540501,
-			"longitude": 37.519243
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 46,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 50,
-				"pupils": null
-			},
-			"История": {
-				"grade": 38,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 51,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 39,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 45,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 59,
-				"pupils": null
-			}
-		},
-		"name": "Школа №2009"
-	}, {
-		"universities": {},
-		"pupils": 1812,
-		"coordinates": {
-			"latitude": 55.868162,
-			"longitude": 37.654089
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 68,
-				"pupils": null
-			},
-			"История": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 80,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 62,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 81,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1558"
-	}, {
-		"universities": {},
-		"pupils": 1212,
-		"coordinates": {
-			"latitude": 55.743613,
-			"longitude": 37.646345
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 65,
-				"pupils": null
-			},
-			"История": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Немецкий": {
-				"grade": 77,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": null
-			}
-		},
-		"name": "Школа №2104 на Таганке"
-	}, {
-		"universities": {
-			"МГУПС": 0.0425531914893617,
-			"МГТУ имени Баумана": 0.0851063829787234,
-			"МГУ": 0.19148936170212766,
-			"НИУ ВШЭ": 0.0425531914893617,
-			"МАИ": 0.0851063829787234
-		},
-		"pupils": 1023,
-		"coordinates": {
-			"latitude": 55.804845,
-			"longitude": 37.532035
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 65,
-				"pupils": null
-			},
-			"История": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 67,
-				"pupils": null
-			},
-			"География": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1575"
-	}, {
-		"universities": {
-			"НИУ ВШЭ": 0.02,
-			"Финансовый университет": 0.08666666666666667,
-			"РАНХиГС при Президенте РФ": 0.04666666666666667,
-			"МГУ": 0.58,
-			"АГПС МЧС России": 0.02
-		},
-		"pupils": 2218,
-		"coordinates": {
-			"latitude": 55.548136,
-			"longitude": 37.563844
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 51,
-				"pupils": 4
-			},
-			"Обществознание": {
-				"grade": 52,
-				"pupils": 13
-			},
-			"История": {
-				"grade": 54,
-				"pupils": 3
-			},
-			"Биология": {
-				"grade": 74,
-				"pupils": 12
-			},
-			"Химия": {
-				"grade": 74,
-				"pupils": 8
-			},
-			"Литература": {
-				"grade": 60,
-				"pupils": 3
-			},
-			"Математика": {
-				"grade": 42,
-				"pupils": 30
-			},
-			"Информатика": {
-				"grade": 56,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": 30
-			}
-		},
-		"name": "Школа №1354"
-	}, {
-		"universities": {
-			"МИРЭА": 0.08333333333333333,
-			"ГУУ": 0.08333333333333333,
-			"МГУ": 0.5,
-			"АГПС МЧС России": 0.16666666666666666,
-			"АПИ при ИГиП РАН": 0.08333333333333333
-		},
-		"pupils": 1663,
-		"coordinates": {
-			"latitude": 55.874339,
-			"longitude": 37.519306
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {},
-		"name": "Школа №2098 "
-	}, {
-		"universities": {},
-		"pupils": 3342,
-		"coordinates": {
-			"latitude": 55.749653,
-			"longitude": 37.589033
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Французский": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 73,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1231 Поленова"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.03225806451612903,
-			"РЭУ имени Плеханова": 0.0967741935483871,
-			"ВАВТ": 0.03225806451612903,
-			"МГУ": 0.5161290322580645,
-			"МГК имени Чайковского": 0.03225806451612903
-		},
-		"pupils": 2473,
-		"coordinates": {
-			"latitude": 55.617154,
-			"longitude": 37.738818
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Математика": {
-				"grade": 51,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 75,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1569 "
-	}, {
-		"universities": {
-			"Финансовый университет": 0.05063291139240506,
-			"МГЮА имени Кутафина": 0.02531645569620253,
-			"РАНХиГС при Президенте РФ": 0.05063291139240506,
-			"МГУ": 0.34177215189873417,
-			"РУДН": 0.0759493670886076
-		},
-		"pupils": 1436,
-		"coordinates": {
-			"latitude": 55.634786,
-			"longitude": 37.596273
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 50,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 60,
-				"pupils": null
-			},
-			"История": {
-				"grade": 64,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 73,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"География": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 69,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1158"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.05172413793103448,
-			"Первый МГМУ имени Сеченова": 0.08620689655172414,
-			"РНИМУ имени Пирогова": 0.06896551724137931,
-			"МГУ": 0.29310344827586204,
-			"АПИ при ИГиП РАН": 0.05172413793103448
-		},
-		"pupils": 2493,
-		"coordinates": {
-			"latitude": 55.742559,
-			"longitude": 37.680823
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 59,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 63,
-				"pupils": null
-			},
-			"История": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 51,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 78,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1468"
-	}, {
-		"universities": {},
-		"pupils": 1240,
-		"coordinates": {
-			"latitude": 55.83846,
-			"longitude": 37.527229
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Русский": {
-				"grade": 79,
-				"pupils": 79
-			},
-			"Математика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 66,
-				"pupils": 7
-			},
-			"Обществознание": {
-				"grade": 70,
-				"pupils": 45
-			},
-			"Литература": {
-				"grade": 66,
-				"pupils": 7
-			}
-		},
-		"name": "Школа №1223 "
-	}, {
-		"universities": {
-			"МЭСИ": 0.038461538461538464,
-			"РАНХиГС при Президенте РФ": 0.038461538461538464,
-			"МГУ": 0.4230769230769231,
-			"НИУ ВШЭ": 0.07692307692307693,
-			"МГТУ имени Баумана": 0.038461538461538464
-		},
-		"pupils": 861,
-		"coordinates": {
-			"latitude": 55.692338,
-			"longitude": 37.543731
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 71,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": null
-			},
-			"История": {
-				"grade": 55,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 81,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 75,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 83,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №1533 (информационных технологий)"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.11210762331838565,
-			"АГЗ МЧС России": 0.017937219730941704,
-			"МГУ": 0.5201793721973094,
-			"АГПС МЧС России": 0.026905829596412557,
-			"АПИ при ИГиП РАН": 0.04484304932735426
-		},
-		"pupils": 3957,
-		"coordinates": {
-			"latitude": 55.77551,
-			"longitude": 37.725047
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 54,
-				"pupils": null
-			},
-			"История": {
-				"grade": 48,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 50,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 48,
-				"pupils": null
-			},
-			"География": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 71,
-				"pupils": null
-			}
-		},
-		"name": "Лицей №429 "
-	}, {
-		"universities": {},
-		"pupils": 4611,
-		"coordinates": {
-			"latitude": 55.569387,
-			"longitude": 37.57254
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": null
-			},
-			"История": {
-				"grade": 47,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 70,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 69,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 75,
-				"pupils": null
-			}
-		},
-		"name": "Школа №2114"
-	}, {
-		"universities": {},
-		"pupils": 2774,
-		"coordinates": {
-			"latitude": 55.646584,
-			"longitude": 37.399964
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 58,
-				"pupils": 20
-			},
-			"Обществознание": {
-				"grade": 62,
-				"pupils": 85
-			},
-			"История": {
-				"grade": 50,
-				"pupils": 20
-			},
-			"Биология": {
-				"grade": 64,
-				"pupils": 15
-			},
-			"Химия": {
-				"grade": 66,
-				"pupils": 15
-			},
-			"Литература": {
-				"grade": 68,
-				"pupils": 5
-			},
-			"Английский": {
-				"grade": 65,
-				"pupils": 45
-			},
-			"Математика": {
-				"grade": 52,
-				"pupils": 99
-			},
-			"Информатика": {
-				"grade": 66,
-				"pupils": 15
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 128
-			}
-		},
-		"name": "Гимназия №1542"
-	}, {
-		"universities": {},
-		"pupils": 1627,
-		"coordinates": {
-			"latitude": 55.630868,
-			"longitude": 37.507295
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 58,
-				"pupils": 18
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": 52
-			},
-			"История": {
-				"grade": 59,
-				"pupils": 17
-			},
-			"Биология": {
-				"grade": 68,
-				"pupils": 15
-			},
-			"Химия": {
-				"grade": 66,
-				"pupils": 11
-			},
-			"Литература": {
-				"grade": 60,
-				"pupils": 9
-			},
-			"Английский": {
-				"grade": 81,
-				"pupils": 32
-			},
-			"Математика": {
-				"grade": 56,
-				"pupils": 55
-			},
-			"Информатика": {
-				"grade": 64,
-				"pupils": 7
-			},
-			"География": {
-				"grade": 56,
-				"pupils": 6
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": 90
-			}
-		},
-		"name": "Гимназия №1507"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.06593406593406594,
-			"АПИ при ИГиП РАН": 0.03296703296703297,
-			"РАНХиГС при Президенте РФ": 0.04395604395604396,
-			"МГУ": 0.45054945054945056,
-			"ИГУ МГИМО МИД РФ": 0.03296703296703297
-		},
-		"pupils": 2275,
-		"coordinates": {
-			"latitude": 55.856492,
-			"longitude": 37.34682
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 57,
-				"pupils": 18
-			},
-			"Обществознание": {
-				"grade": 59,
-				"pupils": 77
-			},
-			"История": {
-				"grade": 59,
-				"pupils": 26
-			},
-			"Биология": {
-				"grade": 78,
-				"pupils": 18
-			},
-			"Химия": {
-				"grade": 69,
-				"pupils": 13
-			},
-			"Литература": {
-				"grade": 64,
-				"pupils": 9
-			},
-			"Английский": {
-				"grade": 71,
-				"pupils": 44
-			},
-			"Математика": {
-				"grade": 47,
-				"pupils": 85
-			},
-			"Информатика": {
-				"grade": 54,
-				"pupils": 16
-			},
-			"Русский": {
-				"grade": 76,
-				"pupils": 115
-			}
-		},
-		"name": "Школа №1358"
-	}, {
-		"universities": {
-			"МПГУ": 0.032520325203252036,
-			"МФТИ": 0.04878048780487805,
-			"РАНХиГС при Президенте РФ": 0.04065040650406504,
-			"МГУ": 0.2682926829268293,
-			"МГТУ имени Баумана": 0.21138211382113822
-		},
-		"pupils": null,
-		"coordinates": {
-			"latitude": 55.790671,
-			"longitude": 37.796463
-		},
-		"gia": {},
-		"year": 2013,
-		"ege": {},
-		"name": "Школа №444"
-	}, {
-		"universities": {},
-		"pupils": 653,
-		"coordinates": {
-			"latitude": 55.849782,
-			"longitude": 37.494575
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 63,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 66,
-				"pupils": null
-			},
-			"История": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 68,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 77,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1583"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.041666666666666664,
-			"МГСУ-МИСИ": 0.041666666666666664,
-			"МГУ": 0.3333333333333333,
-			"НИУ ВШЭ": 0.16666666666666666,
-			"МГТУ имени Баумана": 0.25
-		},
-		"pupils": 1261,
-		"coordinates": {
-			"latitude": 55.874258,
-			"longitude": 37.719172
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 58,
-				"pupils": 48
-			},
-			"Обществознание": {
-				"grade": 61,
-				"pupils": 53
-			},
-			"История": {
-				"grade": 62,
-				"pupils": 14
-			},
-			"Биология": {
-				"grade": 52,
-				"pupils": 8
-			},
-			"Химия": {
-				"grade": 71,
-				"pupils": 2
-			},
-			"Литература": {
-				"grade": 62,
-				"pupils": 9
-			},
-			"Английский": {
-				"grade": 75,
-				"pupils": 27
-			},
-			"Математика": {
-				"grade": 63,
-				"pupils": 104
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": 26
-			},
-			"Русский": {
-				"grade": 76,
-				"pupils": 105
-			}
-		},
-		"name": "Лицей №1537"
-	}, {
-		"universities": {
-			"МЭСИ": 0.04081632653061224,
-			"АГЗ МЧС России": 0.061224489795918366,
-			"МГУ": 0.22448979591836735,
-			"ВАВТ": 0.04081632653061224,
-			"МАИ": 0.08163265306122448
-		},
-		"pupils": 1311,
-		"coordinates": {
-			"latitude": 55.780502,
-			"longitude": 37.48384
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 56,
-				"pupils": 34
-			},
-			"Обществознание": {
-				"grade": 65,
-				"pupils": 52
-			},
-			"История": {
-				"grade": 74,
-				"pupils": 8
-			},
-			"Биология": {
-				"grade": 74,
-				"pupils": 13
-			},
-			"Литература": {
-				"grade": 71,
-				"pupils": 8
-			},
-			"Английский": {
-				"grade": 71,
-				"pupils": 31
-			},
-			"Математика": {
-				"grade": 54,
-				"pupils": 95
-			},
-			"Информатика": {
-				"grade": 57,
-				"pupils": 16
-			},
-			"География": {
-				"grade": 79,
-				"pupils": 2
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": 100
-			}
-		},
-		"name": "Лицей №1560"
-	}, {
-		"universities": {
-			"Финансовый университет": 0.05263157894736842,
-			"Finanzgruppe Hochschule": 0.05263157894736842,
-			"МГУ": 0.15789473684210525,
-			"МГОУ": 0.10526315789473684,
-			"МосАП при Правительстве Москвы": 0.05263157894736842
-		},
-		"pupils": 721,
-		"coordinates": {
-			"latitude": 55.778674,
-			"longitude": 37.546057
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 68,
-				"pupils": 9
-			},
-			"Обществознание": {
-				"grade": 73,
-				"pupils": 47
-			},
-			"История": {
-				"grade": 64,
-				"pupils": 22
-			},
-			"Биология": {
-				"grade": 79,
-				"pupils": 11
-			},
-			"Химия": {
-				"grade": 75,
-				"pupils": 14
-			},
-			"Литература": {
-				"grade": 75,
-				"pupils": 7
-			},
-			"Английский": {
-				"grade": 83,
-				"pupils": 23
-			},
-			"Математика": {
-				"grade": 66,
-				"pupils": 55
-			},
-			"Информатика": {
-				"grade": 69,
-				"pupils": 13
-			},
-			"География": {
-				"grade": 72,
-				"pupils": 3
-			},
-			"Русский": {
-				"grade": 83,
-				"pupils": 83
-			}
-		},
-		"name": "Московский кадетский корпус "
-	}, {
-		"universities": {
-			"РГГУ": 0.06666666666666667,
-			"РУДН": 0.044444444444444446,
-			"МГУ": 0.3333333333333333,
-			"НИУ ВШЭ": 0.08888888888888889,
-			"РХТУ имени Менделеева": 0.06666666666666667
-		},
-		"pupils": 393,
-		"coordinates": {
-			"latitude": 55.720966,
-			"longitude": 37.649103
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 74,
-				"pupils": 14
-			},
-			"Обществознание": {
-				"grade": 66,
-				"pupils": 25
-			},
-			"История": {
-				"grade": 58,
-				"pupils": 30
-			},
-			"Биология": {
-				"grade": 81,
-				"pupils": 16
-			},
-			"Химия": {
-				"grade": 75,
-				"pupils": 11
-			},
-			"Литература": {
-				"grade": 70,
-				"pupils": 25
-			},
-			"Английский": {
-				"grade": 76,
-				"pupils": 47
-			},
-			"Математика": {
-				"grade": 61,
-				"pupils": 71
-			},
-			"Информатика": {
-				"grade": 60,
-				"pupils": 8
-			},
-			"География": {
-				"grade": 76,
-				"pupils": 4
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": 85
-			}
-		},
-		"name": "Лицей №1553 имени В.И. Вернадского"
-	}, {
-		"universities": {},
-		"pupils": 518,
-		"coordinates": {
-			"latitude": 55.636361,
-			"longitude": 37.532331
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 64,
-				"pupils": null
-			},
-			"История": {
-				"grade": 56,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 59,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 76,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 50,
-				"pupils": null
-			},
-			"География": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 74,
-				"pupils": null
-			}
-		},
-		"name": "Школа №17"
-	}, {
-		"universities": {
-			"МГИМО": 0.03977272727272727,
-			"РАНХиГС при Президенте РФ": 0.05113636363636364,
-			"МГУ": 0.4772727272727273,
-			"ВАВТ": 0.028409090909090908,
-			"МГТУ имени Баумана": 0.03409090909090909
-		},
-		"pupils": 1600,
-		"coordinates": {
-			"latitude": 55.793141,
-			"longitude": 37.684775
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 66,
-				"pupils": null
-			},
-			"История": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 65,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 74,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 60,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 85,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 53,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 48,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 76,
-				"pupils": null
-			}
-		},
-		"name": "Гимназия №1530 "
-	}, {
-		"universities": {},
-		"pupils": 969,
-		"coordinates": {
-			"latitude": 55.794143,
-			"longitude": 37.506783
-		},
-		"gia": {},
-		"year": 2015,
-		"ege": {
-			"Физика": {
-				"grade": 66,
-				"pupils": null
-			},
-			"Обществознание": {
-				"grade": 58,
-				"pupils": null
-			},
-			"История": {
-				"grade": 67,
-				"pupils": null
-			},
-			"Биология": {
-				"grade": 47,
-				"pupils": null
-			},
-			"Английский": {
-				"grade": 77,
-				"pupils": null
-			},
-			"Химия": {
-				"grade": 72,
-				"pupils": null
-			},
-			"Литература": {
-				"grade": 61,
-				"pupils": null
-			},
-			"Французский": {
-				"grade": 84,
-				"pupils": null
-			},
-			"Математика": {
-				"grade": 54,
-				"pupils": null
-			},
-			"Информатика": {
-				"grade": 58,
-				"pupils": null
-			},
-			"География": {
-				"grade": 78,
-				"pupils": null
-			},
-			"Русский": {
-				"grade": 75,
-				"pupils": null
-			}
-		},
-		"name": "Школа №1251 Шарля де Голля"
-	}, {
-		"universities": {},
-		"pupils": 806,
-		"coordinates": {
-			"latitude": 55.690461,
-			"longitude": 37.500405
-		},
-		"gia": {},
-		"year": 2014,
-		"ege": {
-			"Физика": {
-				"grade": 71,
-				"pupils": 11
-			},
-			"Обществознание": {
-				"grade": 62,
-				"pupils": 25
-			},
-			"История": {
-				"grade": 48,
-				"pupils": 4
-			},
-			"Биология": {
-				"grade": 77,
-				"pupils": 17
-			},
-			"Химия": {
-				"grade": 76,
-				"pupils": 11
-			},
-			"Литература": {
-				"grade": 72,
-				"pupils": 2
-			},
-			"Английский": {
-				"grade": 75,
-				"pupils": 13
-			},
-			"Математика": {
-				"grade": 57,
-				"pupils": 51
-			},
-			"Информатика": {
-				"grade": 81,
-				"pupils": 6
-			},
-			"Русский": {
-				"grade": 79,
-				"pupils": 51
-			}
-		},
-		"name": "Школа №1434 "
-	}];
+	"use strict";module.exports = [{"universities":{"РАНХиГС при Президенте РФ":0.02631578947368421,"Финансовый университет":0.021052631578947368,"АГЗ МЧС России":0.04736842105263158,"МГУ":0.6,"РУДН":0.021052631578947368},"name":"Школа №41","gia":{"Физика":{"grade":3,"pupils":2},"Обществознание":{"grade":3.4,"pupils":31},"История":{"grade":3,"pupils":3},"Биология":{"grade":3.7,"pupils":15},"Химия":{"grade":4,"pupils":1},"Математика":{"grade":3.3,"pupils":108},"Английский":{"grade":3.7,"pupils":10},"Литература":{"grade":3,"pupils":2},"Информатика":{"grade":4.2,"pupils":9},"Русский":{"grade":3.6,"pupils":106}},"year":2015,"report":"http://sch41.mskobr.ru/files/_SCH41/documents/publ_otchet/2014-2015%20%D0%B3%D0%BE%D0%B4.pdf","coordinates":{"latitude":55.614246,"longitude":37.294718},"ege":{},"pupils":2200},{"universities":{"Финансовый университет":0.023255813953488372,"МПГУ":0.046511627906976744,"МГИМО":0.046511627906976744,"МГУ":0.46511627906976744,"МГТУ Станкин":0.023255813953488372},"name":"Школа №843","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":3.9,"pupils":15},"Биология":{"grade":4.7,"pupils":3},"Химия":{"grade":4.3,"pupils":6},"Математика":{"grade":3.6,"pupils":95},"Английский":{"grade":4.1,"pupils":8},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.2,"pupils":11},"География":{"grade":5,"pupils":1},"Русский":{"grade":3.9,"pupils":95}},"year":2015,"report":"http://sch843.mskobr.ru/files/Documents/publichni_otche/%D0%9F%D0%A3%D0%91%D0%9B%D0%98%D0%A7%D0%9D%D0%AB%D0%99%20%D0%9E%D0%A2%D0%A7%D0%95%D0%A2%2014-15.pdf","coordinates":{"latitude":55.670965,"longitude":37.457286},"ege":{},"pupils":2340},{"universities":{"Collège Universitaire Français de Moscou":0.01834862385321101,"МЭСИ":0.027522935779816515,"Финансовый университет":0.045871559633027525,"МГУ":0.5137614678899083,"АФСБ РФ":0.01834862385321101},"name":"Школа №1000","gia":{"Физика":{"grade":3.8,"pupils":8},"Обществознание":{"grade":3.6,"pupils":18},"Биология":{"grade":3,"pupils":3},"Химия":{"grade":5,"pupils":1},"Английский":{"grade":3.3,"pupils":7},"Математика":{"grade":3.4,"pupils":78},"Информатика":{"grade":4.5,"pupils":2},"География":{"grade":3.3,"pupils":4},"Русский":{"grade":3.7,"pupils":78}},"year":2014,"report":"http://sch1000.mskobr.ru/files/documenti/Publichniy_dok/publichnyj_otchet_gbou_shkola_1000_1.pdf","coordinates":{"latitude":55.657733,"longitude":37.390604},"ege":{},"pupils":1040},{"universities":{"МНИ":0.02702702702702703,"МГТУ МИРЭА":0.05405405405405406,"РАНХиГС при Президенте РФ":0.05405405405405406,"МГУ":0.32432432432432434,"НИЯУ МИФИ":0.05405405405405406},"name":"Школа №1018","gia":{"Физика":{"grade":4,"pupils":20},"Обществознание":{"grade":4,"pupils":21},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.5,"pupils":2},"Химия":{"grade":4.8,"pupils":5},"Английский":{"grade":4.7,"pupils":11},"Математика":{"grade":4.4,"pupils":78},"Информатика":{"grade":4.9,"pupils":22},"География":{"grade":3.9,"pupils":12},"Русский":{"grade":4.3,"pupils":78}},"year":2014,"report":"http://sch1018.mskobr.ru/files/dokuments/publik_otchet/publichn_otcheta_1018_za_2013-2014.pdf","coordinates":{"latitude":55.640985,"longitude":37.351078},"ege":{},"pupils":900},{"universities":{"МЭПИ":0.05128205128205128,"РГГУ":0.05128205128205128,"МЭСИ":0.07692307692307693,"МГУ":0.28205128205128205,"МАТИ":0.07692307692307693},"name":"Школа №1293","gia":{"Физика":{"grade":3.7,"pupils":20},"Обществознание":{"grade":3.7,"pupils":60},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.3,"pupils":8},"Английский":{"grade":4.1,"pupils":64},"Химия":{"grade":4.5,"pupils":15},"Математика":{"grade":3.8,"pupils":181},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4.4,"pupils":8},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":181}},"year":2015,"report":"http://sch1293.mskobr.ru/files/publichnyj_otchet_2014-2015.docx","coordinates":{"latitude":55.742939,"longitude":37.410583},"ege":{},"pupils":1920},{"universities":{"МИГУП":0.033707865168539325,"Финансовый университет":0.033707865168539325,"МГУ":0.3595505617977528,"РУДН":0.02247191011235955,"АМИ":0.02247191011235955},"name":"Школа №1400","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":4,"pupils":49},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.7,"pupils":14},"Химия":{"grade":4.3,"pupils":3},"Математика":{"grade":3.5,"pupils":220},"Английский":{"grade":4.4,"pupils":14},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.5,"pupils":2},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":3.8,"pupils":220}},"year":2015,"report":"http://sch1400z.mskobr.ru/files/%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%20%202015%2C%2028.06%281%29.pdf","coordinates":{"latitude":55.721087,"longitude":37.4114},"ege":{},"pupils":2480},{"universities":{"РУДН":0.02631578947368421,"МГИМО":0.07894736842105263,"МГПИ":0.02631578947368421,"МГУ":0.2894736842105263,"МГЮА имени Кутафина":0.02631578947368421},"name":"Гимназия №1541","gia":{"Физика":{"grade":5,"pupils":2},"Обществознание":{"grade":3.8,"pupils":8},"Биология":{"grade":4.3,"pupils":7},"Английский":{"grade":4.7,"pupils":10},"Химия":{"grade":4.7,"pupils":6},"Математика":{"grade":4.5,"pupils":42},"Французский":{"grade":5,"pupils":11},"Литература":{"grade":5,"pupils":5},"Информатика":{"grade":4.8,"pupils":11},"Русский":{"grade":4.8,"pupils":42}},"year":2015,"report":"http://gym1541.mskobr.ru/files/1541_publichnyj_doklad_2014-20151.pdf","coordinates":{"latitude":55.672813,"longitude":37.504349},"ege":{},"pupils":640},{"universities":{"Финансовый университет":0.02857142857142857,"РУДН":0.02857142857142857,"МГИМО":0.0380952380952381,"МГУ":0.4857142857142857,"НИУ ВШЭ":0.12380952380952381},"name":"Гимназия №1543","gia":{"Биология":{"grade":4,"pupils":1},"Химия":{"grade":4.7,"pupils":3},"Математика":{"grade":4.8,"pupils":97},"Английский":{"grade":4.7,"pupils":25},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":5,"pupils":1},"Русский":{"grade":4.7,"pupils":97}},"year":2015,"report":"http://gym1543.mskobr.ru/files/samootchet_gimnazii_1543_v_2015.pdf","coordinates":{"latitude":55.656016,"longitude":37.486158},"ege":{"Физика":{"grade":74,"pupils":21},"Обществознание":{"grade":74,"pupils":26},"История":{"grade":77,"pupils":17},"Биология":{"grade":85,"pupils":23},"Английский":{"grade":84,"pupils":34},"Химия":{"grade":83,"pupils":23},"Литература":{"grade":67,"pupils":9},"Французский":{"grade":80,"pupils":1},"Математика":{"grade":73,"pupils":75},"Информатика":{"grade":81,"pupils":15},"Русский":{"grade":85,"pupils":75}},"pupils":669},{"universities":{"РГГУ":0.034482758620689655,"РУДН":0.034482758620689655,"РАНХиГС при Президенте РФ":0.04597701149425287,"МГУ":0.39080459770114945,"НИУ ВШЭ":0.09195402298850575},"name":"Гимназия №1567","gia":{"Физика":{"grade":4.4,"pupils":37},"Обществознание":{"grade":4.2,"pupils":6},"Биология":{"grade":4.3,"pupils":27},"Химия":{"grade":4.8,"pupils":20},"Математика":{"grade":4.4,"pupils":148},"Английский":{"grade":4.6,"pupils":42},"Литература":{"grade":4.3,"pupils":31},"Информатика":{"grade":4.7,"pupils":16},"География":{"grade":4,"pupils":3},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.4,"pupils":148}},"year":2014,"report":"http://gym1567.mskobr.ru/files/dir_otchet_14.doc","coordinates":{"latitude":55.749106,"longitude":37.558472},"ege":{"Физика":{"grade":66,"pupils":null},"Обществознание":{"grade":73,"pupils":null},"История":{"grade":71,"pupils":null},"Биология":{"grade":85,"pupils":null},"Химия":{"grade":81,"pupils":null},"Литература":{"grade":72,"pupils":null},"Английский":{"grade":78,"pupils":null},"Математика":{"grade":69,"pupils":null},"Информатика":{"grade":74,"pupils":null},"Русский":{"grade":84,"pupils":null}},"pupils":700},{"universities":{"РГГУ":0.03636363636363636,"Финансовый университет":0.05454545454545454,"Первый МГМУ имени Сеченова":0.03636363636363636,"МГУ":0.41818181818181815,"МГТУ имени Баумана":0.03636363636363636},"name":"Школа №1741","gia":{"Физика":{"grade":3.3,"pupils":12},"Обществознание":{"grade":3.9,"pupils":16},"Биология":{"grade":4,"pupils":1},"Английский":{"grade":4.1,"pupils":15},"Химия":{"grade":4.4,"pupils":5},"Математика":{"grade":3.8,"pupils":76},"Французский":{"grade":4.5,"pupils":2},"Литература":{"grade":4.3,"pupils":6},"Информатика":{"grade":4.1,"pupils":22},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":4.2,"pupils":76}},"year":2014,"report":"http://sch1741.mskobr.ru/files/sosh_1741/documents/publichniy_otchet/publichnyj_otchet_o_deyatel_nosti_gbou_sosh_za_2013_-2014_uchebnyj_god.pdf","coordinates":{"latitude":55.666442,"longitude":37.455543},"ege":{},"pupils":1320},{"universities":{"МГИМО":0.16666666666666666,"Первый МГМУ имени Сеченова":0.16666666666666666,"РАНХиГС при Президенте РФ":0.037037037037037035,"МГУ":0.3148148148148148,"НИУ ВШЭ":0.05555555555555555},"name":"Гимназия №1529","gia":{"Физика":{"grade":3.8,"pupils":5},"Обществознание":{"grade":4.2,"pupils":61},"История":{"grade":3.8,"pupils":6},"Биология":{"grade":4.2,"pupils":22},"Химия":{"grade":4.2,"pupils":19},"Математика":{"grade":4,"pupils":124},"Английский":{"grade":4.5,"pupils":77},"Литература":{"grade":3.3,"pupils":6},"Информатика":{"grade":4.5,"pupils":10},"География":{"grade":4.7,"pupils":3},"Русский":{"grade":4.3,"pupils":125}},"year":2015,"report":"http://gym1529c.mskobr.ru/files/pub_doklad2.pdf","coordinates":{"latitude":55.741333,"longitude":37.603505},"ege":{"Обществознание":{"grade":72,"pupils":null},"История":{"grade":63,"pupils":null},"Биология":{"grade":83,"pupils":null},"Химия":{"grade":75,"pupils":null},"Литература":{"grade":67,"pupils":null},"Английский":{"grade":88,"pupils":null},"Математика":{"grade":70,"pupils":null},"Русский":{"grade":84,"pupils":null}},"pupils":1239},{"universities":{"РУДН":0.03314917127071823,"Финансовый университет":0.049723756906077346,"МГУ":0.20994475138121546,"НИЯУ МИФИ":0.04419889502762431,"МГИМО":0.03314917127071823},"name":"Центр образования №548 ","gia":{"Физика":{"grade":3.8,"pupils":50},"Обществознание":{"grade":4.1,"pupils":87},"История":{"grade":4,"pupils":19},"Биология":{"grade":4,"pupils":56},"Английский":{"grade":4.3,"pupils":65},"Химия":{"grade":4.3,"pupils":39},"Математика":{"grade":4.2,"pupils":247},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4.5,"pupils":13},"Информатика":{"grade":4.4,"pupils":33},"География":{"grade":3.8,"pupils":4},"Русский":{"grade":4.3,"pupils":247}},"year":2014,"report":"http://cou548.mskobr.ru/files/publicreview2014.pdf","coordinates":{"latitude":55.601747,"longitude":37.717115},"ege":{"Физика":{"grade":62,"pupils":null},"Обществознание":{"grade":62,"pupils":null},"История":{"grade":58,"pupils":null},"Биология":{"grade":70,"pupils":null},"Химия":{"grade":69,"pupils":null},"Литература":{"grade":63,"pupils":null},"Английский":{"grade":67,"pupils":null},"Математика":{"grade":53,"pupils":null},"Информатика":{"grade":67,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":1163},{"universities":{"МГПИ":0.04,"Первый МГМУ имени Сеченова":0.12,"РАНХиГС при Президенте РФ":0.06,"МГУ":0.4,"ГУУ":0.06},"name":"Школа №1034","gia":{"Физика":{"grade":3.9,"pupils":8},"Обществознание":{"grade":3.7,"pupils":27},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":3.3,"pupils":32},"Химия":{"grade":3.6,"pupils":21},"Английский":{"grade":4.2,"pupils":23},"Математика":{"grade":3.5,"pupils":122},"Информатика":{"grade":3.8,"pupils":19},"География":{"grade":3.6,"pupils":20},"Русский":{"grade":3.9,"pupils":123}},"year":2015,"report":"http://sch1034.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%93%D0%91%D0%9E%D0%A3%20%D0%A8%D0%BA%D0%BE%D0%BB%D0%B0%201034%20%282014-2015%29.pdf","coordinates":{"latitude":55.631341,"longitude":37.759282},"ege":{},"pupils":1720},{"universities":{"МЭИ":0.038461538461538464,"РЭУ имени Плеханова":0.0641025641025641,"АГЗ МЧС России":0.038461538461538464,"МГУ":0.3076923076923077,"Финансовый университет":0.02564102564102564},"name":"Школа №1173","gia":{"Физика":{"grade":4,"pupils":7},"Обществознание":{"grade":3.6,"pupils":56},"История":{"grade":3.8,"pupils":5},"Биология":{"grade":3.5,"pupils":27},"Химия":{"grade":3.2,"pupils":5},"Математика":{"grade":3.8,"pupils":117},"Английский":{"grade":4.1,"pupils":22},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.7,"pupils":15},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":4.1,"pupils":117}},"year":2015,"report":"http://sch1173.mskobr.ru/files/00-03/2014-2015dir_public_doclad..pdf","coordinates":{"latitude":55.61658,"longitude":37.594692},"ege":{},"pupils":1520},{"universities":{"ИСИ":0.02857142857142857,"МГСУ НИУ":0.05714285714285714,"Финансовый университет":0.02857142857142857,"МГУ":0.5428571428571428,"МГЛУ":0.05714285714285714},"name":"Школа №1207","gia":{"Физика":{"grade":3.8,"pupils":19},"Обществознание":{"grade":4.1,"pupils":46},"История":{"grade":2,"pupils":1},"Биология":{"grade":4.3,"pupils":10},"Химия":{"grade":4.5,"pupils":11},"Английский":{"grade":4.3,"pupils":39},"Математика":{"grade":3.7,"pupils":148},"Информатика":{"grade":4.5,"pupils":15},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":4.2,"pupils":148}},"year":2014,"report":"http://sch1207u.mskobr.ru/files/%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%20%20%28%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F%2002.02.%202015%29.doc","coordinates":{"latitude":55.60546,"longitude":37.709236},"ege":{},"pupils":2020},{"universities":{"РГГУ":0.06666666666666667,"РУДН":0.044444444444444446,"МГУ":0.3333333333333333,"НИУ ВШЭ":0.08888888888888889,"РХТУ имени Менделеева":0.06666666666666667},"name":"Лицей №1553 имени Вернадского","gia":{"Физика":{"grade":3.7,"pupils":17},"Обществознание":{"grade":4.2,"pupils":13},"История":{"grade":4,"pupils":12},"Биология":{"grade":4.2,"pupils":20},"Химия":{"grade":4.2,"pupils":17},"Математика":{"grade":4.5,"pupils":89},"Английский":{"grade":4.2,"pupils":27},"Литература":{"grade":4.1,"pupils":22},"Информатика":{"grade":4.5,"pupils":17},"География":{"grade":4.3,"pupils":6},"Русский":{"grade":4.4,"pupils":89}},"year":2015,"report":"http://lycu1553.mskobr.ru/report/","coordinates":{"latitude":55.720966,"longitude":37.649103},"ege":{"Физика":{"grade":74,"pupils":14},"Обществознание":{"grade":66,"pupils":25},"История":{"grade":58,"pupils":30},"Биология":{"grade":81,"pupils":16},"Химия":{"grade":75,"pupils":11},"Литература":{"grade":70,"pupils":25},"Английский":{"grade":76,"pupils":47},"Математика":{"grade":61,"pupils":71},"Информатика":{"grade":60,"pupils":8},"География":{"grade":76,"pupils":4},"Русский":{"grade":79,"pupils":85}},"pupils":393},{"universities":{"МГАВМиБ имени Скрябина":0.0425531914893617,"МПГУ":0.0851063829787234,"Финансовый университет":0.06382978723404255,"МГУ":0.3829787234042553,"АГПС МЧС России":0.0425531914893617},"name":"Школа №1347","gia":{"Физика":{"grade":3.8,"pupils":21},"Обществознание":{"grade":3.9,"pupils":51},"История":{"grade":3.8,"pupils":4},"Биология":{"grade":3.9,"pupils":14},"Химия":{"grade":3.9,"pupils":11},"Математика":{"grade":3.6,"pupils":181},"Английский":{"grade":4.2,"pupils":42},"Литература":{"grade":3.9,"pupils":11},"Информатика":{"grade":4,"pupils":24},"География":{"grade":3.3,"pupils":3},"Русский":{"grade":4,"pupils":180}},"year":2015,"report":"http://sch1347.mskobr.ru/files/doc/publichni_doklad/doklad_14-15.pdf","coordinates":{"latitude":55.657535,"longitude":37.406531},"ege":{},"pupils":2260},{"universities":{"МЭИ":0.03125,"МГТУ МИРЭА":0.0625,"РАНХиГС при Президенте РФ":0.0625,"МГУ":0.28125,"МГТУ имени Баумана":0.0625},"name":"Лицей №1586","gia":{"Физика":{"grade":3.6,"pupils":14},"Обществознание":{"grade":3.9,"pupils":26},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.7,"pupils":3},"Химия":{"grade":4.7,"pupils":13},"Английский":{"grade":4,"pupils":25},"Математика":{"grade":3.8,"pupils":84},"Информатика":{"grade":3.9,"pupils":16},"География":{"grade":3.4,"pupils":9},"Русский":{"grade":4.1,"pupils":84}},"year":2015,"report":"http://1586.mskobr.ru/files/otchet_o_samoobsledovanii_licej_1586_za_2014-2015_g_s_titulomdoc1.pdf","coordinates":{"latitude":55.709272,"longitude":37.513556},"ege":{},"pupils":1820},{"universities":{"МЭСИ":0.041666666666666664,"Финансовый университет":0.0625,"РАНХиГС при Президенте РФ":0.0625,"МГУ":0.22916666666666666,"МГТУ имени Баумана":0.08333333333333333},"name":"Гимназия №1584","gia":{"Физика":{"grade":4,"pupils":22},"Обществознание":{"grade":4.1,"pupils":32},"Биология":{"grade":4.2,"pupils":14},"Химия":{"grade":4.3,"pupils":20},"Математика":{"grade":4.3,"pupils":99},"Английский":{"grade":4.5,"pupils":34},"Литература":{"grade":4.3,"pupils":4},"Информатика":{"grade":4.6,"pupils":29},"География":{"grade":3.6,"pupils":13},"Русский":{"grade":4.4,"pupils":98}},"year":2015,"report":"http://sch1584.mskobr.ru/files/documenty/19%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D1%81%D0%B0%D0%B9%D1%82%20%D0%BA%D0%BE%D0%BD%D0%BE%D0%B2%D0%B0%D0%BB%D0%BE%D0%B2%D0%B019.pdf","coordinates":{"latitude":55.745123,"longitude":37.428926},"ege":{},"pupils":1480},{"universities":{"МГИУ":0.041666666666666664,"РЭУ имени Плеханова":0.0625,"МАДИ":0.041666666666666664,"МГУ":0.25,"АПИ при ИГиП РАН":0.0625},"name":"Школа №1375","gia":{"Физика":{"grade":3.5,"pupils":2},"Обществознание":{"grade":3.7,"pupils":30},"История":{"grade":4,"pupils":3},"Биология":{"grade":4,"pupils":10},"Химия":{"grade":4.2,"pupils":11},"Математика":{"grade":3.8,"pupils":107},"Английский":{"grade":4.2,"pupils":39},"Литература":{"grade":4.2,"pupils":5},"Информатика":{"grade":4.1,"pupils":7},"География":{"grade":3,"pupils":3},"Русский":{"grade":4,"pupils":107}},"year":2015,"report":"http://sch1375u.mskobr.ru/files/rezultativnost/doklad-direktora-2015.pdf","coordinates":{"latitude":55.681087,"longitude":37.656586},"ege":{},"pupils":1620},{"universities":{"Финансовый университет":0.039473684210526314,"РАНХиГС при Президенте РФ":0.039473684210526314,"МГУ":0.3815789473684211,"НИУ ВШЭ":0.05263157894736842,"АПИ при ИГиП РАН":0.039473684210526314},"name":"Гимназия №1558","gia":{"Физика":{"grade":3.3,"pupils":3},"Обществознание":{"grade":3.6,"pupils":32},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.5,"pupils":6},"Химия":{"grade":3.7,"pupils":3},"Математика":{"grade":3.9,"pupils":138},"Английский":{"grade":4.8,"pupils":62},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":5,"pupils":1},"Испанский":{"grade":4.5,"pupils":62},"Русский":{"grade":4.3,"pupils":138}},"year":2015,"report":"http://gym1558sv.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.pdf","coordinates":{"latitude":55.868162,"longitude":37.654089},"ege":{"Физика":{"grade":59,"pupils":null},"Обществознание":{"grade":68,"pupils":null},"История":{"grade":61,"pupils":null},"Биология":{"grade":75,"pupils":null},"Химия":{"grade":69,"pupils":null},"Литература":{"grade":70,"pupils":null},"Английский":{"grade":80,"pupils":null},"Математика":{"grade":62,"pupils":null},"Информатика":{"grade":65,"pupils":null},"Русский":{"grade":81,"pupils":null}},"pupils":1812},{"universities":{"МГЮА имени Кутафина":0.058823529411764705,"ГУУ":0.058823529411764705,"МГУ":0.5882352941176471,"НИУ ВШЭ":0.11764705882352941,"МГУТУ имени Разумовского":0.058823529411764705},"name":"Гимназия №1306","gia":{"Обществознание":{"grade":4.3,"pupils":24},"История":{"grade":4,"pupils":1},"Английский":{"grade":4.2,"pupils":37},"Химия":{"grade":5,"pupils":1},"Французский":{"grade":4,"pupils":1},"Математика":{"grade":3.8,"pupils":46},"Информатика":{"grade":4.5,"pupils":4},"Испанский":{"grade":4,"pupils":1},"Немецкий":{"grade":3.7,"pupils":9},"Русский":{"grade":4.2,"pupils":46}},"year":2015,"report":"http://gymg1306.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%BE%D1%82%D1%87%D1%91%D1%82%20%D0%93%D0%BE%D1%81%D1%83%D0%B4%D0%B0%D1%80%D1%81%D1%82%D0%B2%D0%B5%D0%BD%D0%BD%D0%BE%D0%B3%D0%BE%20%D0%B1%D1%8E%D0%B4%D0%B6%D0%B5%D1%82%D0%BD%D0%BE%D0%B3%D0%BE%20%D0%BE%D0%B1%D1%80%D0%B0%D0%B7%D0%BE%D0%B2%D0%B0%D1%82%D0%B5%D0%BB%D1%8C%D0%BD%D0%BE%D0%B3%D0%BE%20%D1%83%D1%87%D1%80%D0%B5%D0%B6%D0%B4%D0%B5%D0%BD%D0%B8%D1%8F%20%D0%B3%D0%BE%D1%80%D0%BE%D0%B4%D0%B0%20%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D1%8B%20%D0%93%D0%B8%D0%BC%D0%BD%D0%B0%D0%B7%D0%B8%D0%B8%20%E2%84%96%201306%202014%20%E2%80%93%202015%20%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9%20%D0%B3%D0%BE%D0%B4.pdf","coordinates":{"latitude":55.69799,"longitude":37.509128},"ege":{},"pupils":880},{"universities":{"Финансовый университет":0.03333333333333333,"РАНХиГС при Президенте РФ":0.05,"МГУ":0.3,"МГЮА имени Кутафина":0.03333333333333333,"МГТУ имени Баумана":0.05},"name":"Гимназия №1506","gia":{"Физика":{"grade":3.7,"pupils":27},"Обществознание":{"grade":3.9,"pupils":48},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4,"pupils":20},"Английский":{"grade":4.5,"pupils":45},"Химия":{"grade":4.7,"pupils":13},"Математика":{"grade":3.9,"pupils":181},"Французский":{"grade":3.8,"pupils":5},"Литература":{"grade":4.4,"pupils":5},"Информатика":{"grade":4.5,"pupils":50},"География":{"grade":4.7,"pupils":12},"Русский":{"grade":4.2,"pupils":181}},"year":2015,"report":"http://gym1506.mskobr.ru/files/publ_doklad.pdf","coordinates":{"latitude":55.88976,"longitude":37.6509},"ege":{"Физика":{"grade":61,"pupils":null},"Обществознание":{"grade":64,"pupils":null},"История":{"grade":58,"pupils":null},"Биология":{"grade":75,"pupils":null},"Английский":{"grade":76,"pupils":null},"Химия":{"grade":75,"pupils":null},"Литература":{"grade":68,"pupils":null},"Французский":{"grade":88,"pupils":null},"Математика":{"grade":58,"pupils":null},"Информатика":{"grade":65,"pupils":null},"География":{"grade":63,"pupils":null},"Русский":{"grade":78,"pupils":null}},"pupils":2032},{"universities":{"Финансовый университет":0.21568627450980393,"Первый МГМУ имени Сеченова":0.0392156862745098,"МГУ":0.29411764705882354,"НИУ ВШЭ":0.0392156862745098,"ФА при Правительстве РФ":0.0392156862745098},"name":"Гимназия №1518","gia":{"Физика":{"grade":4.3,"pupils":7},"Обществознание":{"grade":4.3,"pupils":39},"История":{"grade":4,"pupils":3},"Биология":{"grade":4.1,"pupils":8},"Химия":{"grade":4.4,"pupils":8},"Математика":{"grade":4.5,"pupils":78},"Английский":{"grade":4.5,"pupils":50},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.9,"pupils":17},"География":{"grade":4.3,"pupils":3},"Немецкий":{"grade":3.8,"pupils":6},"Русский":{"grade":4.6,"pupils":77}},"year":2015,"report":"http://gum1518.mskobr.ru/files/2015_1518_otchet_o_samoobsledovanii.pdf","coordinates":{"latitude":55.803762,"longitude":37.634577},"ege":{"Физика":{"grade":76,"pupils":null},"Обществознание":{"grade":84,"pupils":null},"История":{"grade":87,"pupils":null},"Биология":{"grade":70,"pupils":null},"Химия":{"grade":71,"pupils":null},"Английский":{"grade":84,"pupils":null},"Математика":{"grade":74,"pupils":null},"Информатика":{"grade":75,"pupils":null},"Русский":{"grade":86,"pupils":null}},"pupils":976},{"universities":{"МАТИ":0.03571428571428571,"Финансовый университет":0.03571428571428571,"РАНХиГС при Президенте РФ":0.07142857142857142,"МГУ":0.32142857142857145,"НИЯУ МИФИ":0.07142857142857142},"name":"Гимназия №1582","gia":{"Физика":{"grade":4.4,"pupils":8},"Обществознание":{"grade":4.5,"pupils":33},"История":{"grade":5,"pupils":2},"Биология":{"grade":3.9,"pupils":7},"Химия":{"grade":4.5,"pupils":11},"Математика":{"grade":4.4,"pupils":67},"Английский":{"grade":5,"pupils":21},"Литература":{"grade":5,"pupils":4},"Информатика":{"grade":5,"pupils":4},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.7,"pupils":67}},"year":2015,"report":"http://gym1582u.mskobr.ru/files/publichnyj_doklad.doc","coordinates":{"latitude":55.617805,"longitude":37.601268},"ege":{},"pupils":1000},{"universities":{"Финансовый университет":0.03333333333333333,"РАНХиГС при Президенте РФ":0.1,"МГУ":0.43333333333333335,"НИУ ВШЭ":0.03333333333333333,"АМИ":0.06666666666666667},"name":"Гимназия №1579","gia":{"Физика":{"grade":3.5,"pupils":4},"Обществознание":{"grade":3.9,"pupils":8},"История":{"grade":2,"pupils":1},"Биология":{"grade":4,"pupils":3},"Химия":{"grade":4.8,"pupils":6},"Математика":{"grade":4,"pupils":80},"Английский":{"grade":4.3,"pupils":44},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.7,"pupils":3},"География":{"grade":3,"pupils":1},"Русский":{"grade":4.3,"pupils":80}},"year":2015,"report":"http://gym1579u.mskobr.ru/files/1579_publichnyj_doklad.ppt","coordinates":{"latitude":55.646472,"longitude":37.659182},"ege":{},"pupils":1120},{"universities":{"МАИ":0.05263157894736842,"Первый МГМУ имени Сеченова":0.05263157894736842,"МГУ":0.2631578947368421,"ГУУ":0.07017543859649122,"МГТУ имени Баумана":0.17543859649122806},"name":"Гимназия №1516","gia":{"Физика":{"grade":4.2,"pupils":6},"Обществознание":{"grade":4.1,"pupils":16},"Биология":{"grade":4.3,"pupils":6},"Химия":{"grade":4.5,"pupils":13},"Английский":{"grade":4.7,"pupils":18},"Математика":{"grade":4.5,"pupils":85},"Информатика":{"grade":4.8,"pupils":24},"Русский":{"grade":4.4,"pupils":85}},"year":2015,"report":"http://www.gogi1516.ru/Norm_doc/Publ_doclad2015.pdf","coordinates":{"latitude":55.81652,"longitude":37.831767},"ege":{},"pupils":1180},{"universities":{"Финансовый университет":0.03132530120481928,"АМИ":0.024096385542168676,"АГЗ МЧС России":0.024096385542168676,"МГУ":0.5686746987951807,"АПИ при ИГиП РАН":0.03855421686746988},"name":"Школа №15","gia":{},"year":2015,"report":"http://sch15uz.mskobr.ru/files/publichnyj_otchet_2015.pdf","coordinates":{"latitude":55.593482,"longitude":37.661266},"ege":{},"pupils":1836},{"universities":{"Финансовый университет":0.10256410256410256,"РАНХиГС при Президенте РФ":0.02564102564102564,"МГУ":0.5641025641025641,"НИУ ВШЭ":0.015384615384615385,"АМИ":0.015384615384615385},"name":"Гимназия №1257","gia":{"Физика":{"grade":3,"pupils":1},"Обществознание":{"grade":4.2,"pupils":20},"Биология":{"grade":4.3,"pupils":3},"Химия":{"grade":4.5,"pupils":6},"Математика":{"grade":4,"pupils":41},"Английский":{"grade":4.3,"pupils":31},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":5,"pupils":1},"География":{"grade":3.7,"pupils":3},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.4,"pupils":41}},"year":2015,"report":"http://gym1257u.mskobr.ru/files/_%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4_%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0_%D0%B7%D0%B0_2014-2015_%D1%83%D1%87.%D0%B3%D0%BE%D0%B4.pdf","coordinates":{"latitude":55.714328,"longitude":37.625648},"ege":{},"pupils":820},{"universities":{"РАНХиГС при Президенте РФ":0.02408256880733945,"Финансовый университет":0.045871559633027525,"АГЗ МЧС России":0.02408256880733945,"МГУ":0.5538990825688074,"АПИ при ИГиП РАН":0.03096330275229358},"name":"Вторая школа","gia":{"Физика":{"grade":4.3,"pupils":90},"Обществознание":{"grade":4,"pupils":1},"Английский":{"grade":4.5,"pupils":2},"Математика":{"grade":5,"pupils":91},"Информатика":{"grade":4.7,"pupils":7},"Русский":{"grade":4.6,"pupils":90}},"year":2014,"report":"http://lycuz2.mskobr.ru/report/","coordinates":{"latitude":55.69798,"longitude":37.556442},"ege":{"Физика":{"grade":78,"pupils":64},"Обществознание":{"grade":64,"pupils":18},"История":{"grade":66,"pupils":4},"Биология":{"grade":80,"pupils":2},"Химия":{"grade":75,"pupils":4},"Литература":{"grade":50,"pupils":2},"Английский":{"grade":84,"pupils":10},"Математика":{"grade":86,"pupils":79},"Информатика":{"grade":80,"pupils":34},"Русский":{"grade":85,"pupils":78}},"pupils":453},{"universities":{"РАНХиГС при Президенте РФ":0.016717325227963525,"Финансовый университет":0.0364741641337386,"АГЗ МЧС России":0.0243161094224924,"МГУ":0.6033434650455927,"АМИ":0.0182370820668693},"name":"Школа №7","gia":{"Физика":{"grade":3.9,"pupils":20},"Обществознание":{"grade":3.6,"pupils":19},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.8,"pupils":14},"Химия":{"grade":4.1,"pupils":15},"Математика":{"grade":4,"pupils":121},"Английский":{"grade":4.4,"pupils":26},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4,"pupils":46},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.1,"pupils":121}},"year":2015,"report":"http://sch7uz.mskobr.ru/files/publichnyj_doklad_obrazovatel_nogo_uchrezhdeniya_27.pdf","coordinates":{"latitude":55.68326,"longitude":37.524013},"ege":{},"pupils":1520},{"universities":{"Финансовый университет":0.03132530120481928,"АМИ":0.024096385542168676,"АГЗ МЧС России":0.024096385542168676,"МГУ":0.5686746987951807,"АПИ при ИГиП РАН":0.03855421686746988},"name":"Школа №15","gia":{"Физика":{"grade":3.6,"pupils":14},"Обществознание":{"grade":3.8,"pupils":24},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":4,"pupils":10},"Химия":{"grade":4.4,"pupils":10},"Математика":{"grade":3.8,"pupils":180},"Английский":{"grade":4,"pupils":26},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.7,"pupils":14},"География":{"grade":4.1,"pupils":8},"Русский":{"grade":4.1,"pupils":180}},"year":2015,"report":"http://sch15uz.mskobr.ru/files/publichnyj_otchet_2015.pdf","coordinates":{"latitude":55.65209,"longitude":37.559703},"ege":{},"pupils":2100},{"universities":{"Финансовый университет":0.02857142857142857,"АМИ":0.01987577639751553,"АГЗ МЧС России":0.02608695652173913,"МГУ":0.6571428571428571,"АПИ при ИГиП РАН":0.034782608695652174},"name":"Школа №17","gia":{"Физика":{"grade":3.7,"pupils":3},"Обществознание":{"grade":3.9,"pupils":39},"История":{"grade":3,"pupils":1},"Биология":{"grade":4,"pupils":7},"Химия":{"grade":4.3,"pupils":6},"Английский":{"grade":4.5,"pupils":56},"Математика":{"grade":3.8,"pupils":222},"Информатика":{"grade":4,"pupils":5},"География":{"grade":4.3,"pupils":3},"Русский":{"grade":4.1,"pupils":219}},"year":2014,"report":"http://sch17uz.mskobr.ru/files/publichnyj_doklad_20141.docx","coordinates":{"latitude":55.636361,"longitude":37.532331},"ege":{"Физика":{"grade":54,"pupils":null},"Обществознание":{"grade":64,"pupils":null},"История":{"grade":56,"pupils":null},"Биология":{"grade":76,"pupils":null},"Химия":{"grade":59,"pupils":null},"Литература":{"grade":72,"pupils":null},"Английский":{"grade":76,"pupils":null},"Математика":{"grade":53,"pupils":null},"Информатика":{"grade":50,"pupils":null},"География":{"grade":67,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":518},{"universities":{"Первый МГМУ имени Сеченова":0.0196078431372549,"АМИ":0.032679738562091505,"МГУ":0.49673202614379086,"АГПС МЧС России":0.0196078431372549,"АПИ при ИГиП РАН":0.0457516339869281},"name":"Школа №49","gia":{"Физика":{"grade":4,"pupils":5},"Обществознание":{"grade":3.4,"pupils":54},"История":{"grade":3.3,"pupils":3},"Биология":{"grade":3.6,"pupils":27},"Химия":{"grade":4.3,"pupils":20},"Математика":{"grade":3.4,"pupils":205},"Английский":{"grade":4.2,"pupils":34},"Литература":{"grade":3.4,"pupils":5},"Информатика":{"grade":4.2,"pupils":11},"География":{"grade":3.6,"pupils":5},"Русский":{"grade":3.8,"pupils":204}},"year":2015,"report":"http://sch49uz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-15_.pdf","coordinates":{"latitude":55.643444,"longitude":37.53402},"ege":{},"pupils":3140},{"universities":{"МЭСИ":0.02631578947368421,"МПГУ":0.05263157894736842,"Финансовый университет":0.05263157894736842,"МГУ":0.4868421052631579,"РУДН":0.039473684210526314},"name":"Школа №113","gia":{"Физика":{"grade":3.6,"pupils":22},"Обществознание":{"grade":3.6,"pupils":44},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.2,"pupils":11},"Химия":{"grade":3.6,"pupils":11},"Математика":{"grade":3.8,"pupils":99},"Английский":{"grade":3.9,"pupils":13},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4,"pupils":2},"География":{"grade":3.3,"pupils":4},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.1,"pupils":99}},"year":2015,"report":"http://sch113uz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D1%80%D1%83%D0%BA%D0%BE%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D0%B5%D0%BB%D1%8F.pdf","coordinates":{"latitude":55.637642,"longitude":37.516647},"ege":{},"pupils":1460},{"universities":{"Финансовый университет":0.034482758620689655,"СГА":0.034482758620689655,"РЭУ имени Плеханова":0.034482758620689655,"МГУ":0.5172413793103449,"МГТУ имени Баумана":0.06896551724137931},"name":"Школа №1228","gia":{"Физика":{"grade":3.5,"pupils":2},"Обществознание":{"grade":2.9,"pupils":13},"История":{"grade":3,"pupils":2},"Биология":{"grade":3.6,"pupils":8},"Химия":{"grade":4.6,"pupils":5},"Математика":{"grade":3.4,"pupils":85},"Английский":{"grade":4.3,"pupils":24},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":3.9,"pupils":11},"География":{"grade":4,"pupils":1},"Русский":{"grade":3.9,"pupils":84}},"year":2015,"report":"http://sch1228.mskobr.ru/files/%20%D0%BE%20%D1%81%D0%B0%D0%BC%D0%BE%D0%BE%D0%B1%D1%81%D0%BB%D0%B5%D0%B4%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B8%20%D0%93%D0%91%D0%9E%D0%A3%20%D0%A8%D0%BA%D0%BE%D0%BB%D1%8B%20%E2%84%961228%2008.2015%20%D0%B8%D1%82%D0%BE%D0%B3.pdf","coordinates":{"latitude":55.740624,"longitude":37.720241},"ege":{},"pupils":3040},{"universities":{"МЭИ":0.030303030303030304,"Первый МГМУ имени Сеченова":0.030303030303030304,"МГУ":0.19696969696969696,"НИЯУ МИФИ":0.24242424242424243,"МГТУ имени Баумана":0.07575757575757576},"name":"Лицей №1547","gia":{"Физика":{"grade":4.2,"pupils":87},"Обществознание":{"grade":4.1,"pupils":46},"Биология":{"grade":4.3,"pupils":3},"Химия":{"grade":4.5,"pupils":4},"Английский":{"grade":4.7,"pupils":7},"Математика":{"grade":4.8,"pupils":137},"Информатика":{"grade":5,"pupils":2},"Русский":{"grade":4.5,"pupils":137}},"year":2014,"report":"http://licuv1547.mskobr.ru/files/files/public_2014.pdf","coordinates":{"latitude":55.661928,"longitude":37.777104},"ege":{"Физика":{"grade":57,"pupils":61},"Обществознание":{"grade":63,"pupils":36},"История":{"grade":59,"pupils":7},"Биология":{"grade":67,"pupils":5},"Химия":{"grade":59,"pupils":7},"Литература":{"grade":51,"pupils":2},"Английский":{"grade":62,"pupils":31},"Математика":{"grade":63,"pupils":106},"Информатика":{"grade":64,"pupils":17},"География":{"grade":44,"pupils":1},"Русский":{"grade":74,"pupils":106}},"pupils":936},{"universities":{"МГТУ имени Баумана":0.03773584905660377,"НИЯУ МИФИ":0.03773584905660377,"МГУ":0.39622641509433965,"НИУ ВШЭ":0.05660377358490566,"МГЛУ":0.03773584905660377},"name":"Гимназия №1562","gia":{"Физика":{"grade":3.9,"pupils":33},"Обществознание":{"grade":4.1,"pupils":41},"История":{"grade":3.3,"pupils":3},"Биология":{"grade":4,"pupils":9},"Химия":{"grade":4.5,"pupils":25},"Математика":{"grade":4.4,"pupils":141},"Английский":{"grade":4.5,"pupils":22},"Литература":{"grade":4.7,"pupils":3},"Информатика":{"grade":4.7,"pupils":7},"Русский":{"grade":4.4,"pupils":141}},"year":2015,"report":"http://gym1562uv.mskobr.ru/files/publichnyj_doklad_gosudarstvennogo_byudzhetnogo_obrazovatel_nog_uchrezhdeniya_goroda_moskvy_gimnazii_1562_imeni_artema_borovika_za_2014-2015_uchebnyj_god.pdf","coordinates":{"latitude":55.665203,"longitude":37.751314},"ege":{"Физика":{"grade":68,"pupils":23},"Обществознание":{"grade":70,"pupils":55},"История":{"grade":58,"pupils":17},"Биология":{"grade":82,"pupils":4},"Английский":{"grade":79,"pupils":47},"Химия":{"grade":80,"pupils":5},"Литература":{"grade":80,"pupils":6},"Французский":{"grade":83,"pupils":1},"Математика":{"grade":72,"pupils":72},"Информатика":{"grade":71,"pupils":15},"Русский":{"grade":86,"pupils":93}},"pupils":2099},{"universities":{"МЭСИ":0.02127659574468085,"МИГКУ":0.0425531914893617,"МГУ":0.3617021276595745,"РУДН":0.0425531914893617,"АПИ при ИГиП РАН":0.0425531914893617},"name":"Школа №1101","gia":{"Физика":{"grade":3.8,"pupils":8},"Обществознание":{"grade":3.4,"pupils":31},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.9,"pupils":8},"Химия":{"grade":3.6,"pupils":9},"Математика":{"grade":3.6,"pupils":122},"Английский":{"grade":3.8,"pupils":17},"Литература":{"grade":3.7,"pupils":7},"Информатика":{"grade":4.2,"pupils":27},"География":{"grade":3.6,"pupils":11},"Русский":{"grade":3.9,"pupils":122}},"year":2015,"report":"http://sch1101uz.mskobr.ru/files/publichnyj_otchet_2014-2015.pdf","coordinates":{"latitude":55.633297,"longitude":37.477606},"ege":{},"pupils":1520},{"universities":{"Первый МГМУ имени Сеченова":0.05172413793103448,"РАНХиГС при Президенте РФ":0.05172413793103448,"МГУ":0.3103448275862069,"МГТУ МИРЭА":0.05172413793103448,"МГТУ имени Баумана":0.08620689655172414},"name":"Школа №1106","gia":{"Физика":{"grade":3.8,"pupils":4},"Обществознание":{"grade":4,"pupils":26},"История":{"grade":3,"pupils":2},"Биология":{"grade":3.4,"pupils":7},"Химия":{"grade":4.5,"pupils":4},"Английский":{"grade":4.5,"pupils":21},"Математика":{"grade":3.7,"pupils":135},"Информатика":{"grade":4.6,"pupils":5},"География":{"grade":3.5,"pupils":13},"Немецкий":{"grade":5,"pupils":1},"Русский":{"grade":4,"pupils":133}},"year":2015,"report":"http://sch1106uz.mskobr.ru/files/2014-15_publichnyj_doklad_direktora_gbou_shkola_1106.pdf","coordinates":{"latitude":55.592083,"longitude":37.54038},"ege":{},"pupils":2140},{"universities":{"РГГУ":0.03529411764705882,"Финансовый университет":0.03529411764705882,"МАДИ":0.03529411764705882,"МГУ":0.4235294117647059,"МГТУ имени Баумана":0.03529411764705882},"name":"Гимназия №1515","gia":{"Физика":{"grade":4.2,"pupils":17},"Обществознание":{"grade":4.1,"pupils":32},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":4.1,"pupils":10},"Химия":{"grade":3.9,"pupils":7},"Математика":{"grade":3.9,"pupils":108},"Английский":{"grade":4.3,"pupils":18},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.6,"pupils":11},"Русский":{"grade":4.2,"pupils":109}},"year":2015,"report":"http://gym1515sz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.docx.pdf","coordinates":{"latitude":55.780461,"longitude":37.477336},"ege":{},"pupils":2080},{"universities":{"РЭУ имени Плеханова":0.041666666666666664,"Первый МГМУ имени Сеченова":0.05555555555555555,"МГУ":0.2638888888888889,"МАИ":0.05555555555555555,"АПИ при ИГиП РАН":0.06944444444444445},"name":"Гимназия №1517","gia":{"Физика":{"grade":4.3,"pupils":46},"Обществознание":{"grade":3.8,"pupils":117},"История":{"grade":4,"pupils":6},"Биология":{"grade":3.9,"pupils":36},"Химия":{"grade":4.2,"pupils":29},"Математика":{"grade":3.7,"pupils":302},"Английский":{"grade":4.1,"pupils":44},"Литература":{"grade":3.5,"pupils":8},"Информатика":{"grade":4.5,"pupils":42},"География":{"grade":3,"pupils":3},"Русский":{"grade":4,"pupils":303}},"year":2015,"report":"http://gym1517sz.mskobr.ru/report/","coordinates":{"latitude":55.785078,"longitude":37.453163},"ege":{},"pupils":4120},{"universities":{"МГТУ имени Баумана":0.03076923076923077,"РАНХиГС при Президенте РФ":0.046153846153846156,"МГУ":0.35384615384615387,"ГУУ":0.03076923076923077,"МАИ":0.07692307692307693},"name":"Гимназия №1519","gia":{"Физика":{"grade":4.2,"pupils":34},"Обществознание":{"grade":3.9,"pupils":84},"История":{"grade":3.7,"pupils":12},"Биология":{"grade":3.9,"pupils":23},"Химия":{"grade":4.8,"pupils":13},"Математика":{"grade":3.8,"pupils":163},"Английский":{"grade":4.3,"pupils":46},"Литература":{"grade":4.3,"pupils":7},"Информатика":{"grade":3.7,"pupils":48},"География":{"grade":3.6,"pupils":12},"Русский":{"grade":4.2,"pupils":163}},"year":2015,"report":"http://gym1519.mskobr.ru/files/%20%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%20%20%D0%A0%D0%A3%D0%9A%D0%9E%D0%92%D0%9E%D0%94%D0%98%D0%A2%D0%95%D0%9B%D0%AF.docx","coordinates":{"latitude":55.80739,"longitude":37.412496},"ege":{},"pupils":1620},{"universities":{"Первый МГМУ имени Сеченова":0.04,"РГСУ":0.04,"МГУ":0.2,"НИУ ВШЭ":0.06,"МГЛУ":0.06},"name":"Гимназия №1522","gia":{"Физика":{"grade":4.2,"pupils":12},"Обществознание":{"grade":4,"pupils":29},"История":{"grade":3.9,"pupils":7},"Биология":{"grade":4.7,"pupils":3},"Химия":{"grade":4.5,"pupils":4},"Математика":{"grade":4.5,"pupils":66},"Английский":{"grade":4.3,"pupils":60},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":5,"pupils":2},"Русский":{"grade":4.5,"pupils":66}},"year":2015,"report":"http://gym1522.mskobr.ru/files/publichnyj_doklad_2014-20151.pdf","coordinates":{"latitude":55.772846,"longitude":37.482214},"ege":{},"pupils":1240},{"universities":{"МЭСИ":0.015625,"Финансовый университет":0.03125,"МГУ":0.4765625,"ГУУ":0.03125,"МАИ":0.03125},"name":"Гимназия №1538","gia":{"Физика":{"grade":3.6,"pupils":11},"Обществознание":{"grade":3.8,"pupils":66},"История":{"grade":3,"pupils":1},"Биология":{"grade":4.2,"pupils":19},"Химия":{"grade":4.2,"pupils":19},"Математика":{"grade":3.9,"pupils":196},"Английский":{"grade":4.4,"pupils":33},"Литература":{"grade":3.9,"pupils":9},"Информатика":{"grade":4.3,"pupils":22},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":4.2,"pupils":195}},"year":2015,"report":"http://gym1538sz.mskobr.ru/files/publichnyj_doklad_direktora_2015.pdf","coordinates":{"latitude":55.839739,"longitude":37.381342},"ege":{"Физика":{"grade":59,"pupils":26},"Обществознание":{"grade":62,"pupils":103},"История":{"grade":59,"pupils":11},"Биология":{"grade":71,"pupils":30},"Химия":{"grade":65,"pupils":24},"Литература":{"grade":70,"pupils":10},"Английский":{"grade":65,"pupils":46},"Математика":{"grade":55,"pupils":119},"Информатика":{"grade":61,"pupils":18},"География":{"grade":69,"pupils":6},"Русский":{"grade":76,"pupils":168}},"pupils":2610},{"universities":{"РГГУ":0.07407407407407407,"РАНХиГС при Президенте РФ":0.05555555555555555,"МГУ":0.3333333333333333,"МАТИ":0.037037037037037035,"МАИ":0.037037037037037035},"name":"Гимназия №1544","gia":{"Физика":{"grade":3.4,"pupils":19},"Обществознание":{"grade":3.8,"pupils":20},"История":{"grade":5,"pupils":1},"Биология":{"grade":4.1,"pupils":9},"Химия":{"grade":4.5,"pupils":10},"Математика":{"grade":4.3,"pupils":75},"Английский":{"grade":4.4,"pupils":21},"Литература":{"grade":4.5,"pupils":4},"Информатика":{"grade":4.5,"pupils":2},"Русский":{"grade":4.5,"pupils":75}},"year":2014,"report":"http://gym1544sz.mskobr.ru/files/samoobsledovanie-2.doc","coordinates":{"latitude":55.836059,"longitude":37.359513},"ege":{},"pupils":1460},{"universities":{"Финансовый университет":0.041666666666666664,"РАНХиГС при Президенте РФ":0.05555555555555555,"МГУ":0.3888888888888889,"АГПС МЧС России":0.041666666666666664,"МАИ":0.05555555555555555},"name":"Гимназия №1551","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":4,"pupils":44},"История":{"grade":3.8,"pupils":5},"Биология":{"grade":4,"pupils":13},"Химия":{"grade":4,"pupils":20},"Математика":{"grade":3.6,"pupils":178},"Английский":{"grade":4.2,"pupils":23},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":3.9,"pupils":19},"География":{"grade":4,"pupils":2},"Русский":{"grade":4,"pupils":179}},"year":2014,"report":"http://gym1551sz.mskobr.ru/files/itogi_uchebnoo_2013-2014_uch_goda.pdf","coordinates":{"latitude":55.846568,"longitude":37.456082},"ege":{},"pupils":1560},{"universities":{"МЭСИ":0.04081632653061224,"АГЗ МЧС России":0.061224489795918366,"МГУ":0.22448979591836735,"ВАВТ":0.04081632653061224,"МАИ":0.08163265306122448},"name":"Лицей №1560","gia":{"Физика":{"grade":3.7,"pupils":40},"Обществознание":{"grade":3.8,"pupils":66},"История":{"grade":3.3,"pupils":6},"Биология":{"grade":3.4,"pupils":16},"Химия":{"grade":3.9,"pupils":16},"Математика":{"grade":3.7,"pupils":223},"Английский":{"grade":4.1,"pupils":33},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.5,"pupils":30},"География":{"grade":3.3,"pupils":12},"Русский":{"grade":3.9,"pupils":222}},"year":2014,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={92A9E8A1-FFC8-4DBC-BA6E-ACC79FF40EDB}&name=samoobsl_2013-2014.pdf","coordinates":{"latitude":55.780502,"longitude":37.48384},"ege":{"Физика":{"grade":56,"pupils":34},"Обществознание":{"grade":65,"pupils":52},"История":{"grade":74,"pupils":8},"Биология":{"grade":74,"pupils":13},"Литература":{"grade":71,"pupils":8},"Английский":{"grade":71,"pupils":31},"Математика":{"grade":54,"pupils":95},"Информатика":{"grade":57,"pupils":16},"География":{"grade":79,"pupils":2},"Русский":{"grade":74,"pupils":100}},"pupils":1311},{"universities":{"МПГУ":0.03508771929824561,"МЭСИ":0.03508771929824561,"Первый МГМУ имени Сеченова":0.05263157894736842,"МГУ":0.43859649122807015,"РХТУ имени Менделеева":0.03508771929824561},"name":"Лицей №1571","gia":{"Физика":{"grade":4.1,"pupils":65},"Обществознание":{"grade":3.8,"pupils":77},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.7,"pupils":14},"Английский":{"grade":4.5,"pupils":8},"Химия":{"grade":4.3,"pupils":13},"Математика":{"grade":3.9,"pupils":263},"Французский":{"grade":5,"pupils":1},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.7,"pupils":65},"География":{"grade":4,"pupils":4},"Русский":{"grade":4,"pupils":261}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={CC11EB0B-6EAF-4F65-94AE-E90106958938}&name=%D0%A1amoobsledovanie-%D0%93%D0%91%D0%9E%D0%A3-%D0%9Bicey-3-1571.pdf","coordinates":{"latitude":55.857457,"longitude":37.446883},"ege":{"Физика":{"grade":59,"pupils":null},"Обществознание":{"grade":61,"pupils":null},"История":{"grade":57,"pupils":null},"Биология":{"grade":65,"pupils":null},"Химия":{"grade":65,"pupils":null},"Литература":{"grade":65,"pupils":null},"Английский":{"grade":71,"pupils":null},"Математика":{"grade":51,"pupils":null},"Информатика":{"grade":62,"pupils":null},"География":{"grade":53,"pupils":null},"Русский":{"grade":72,"pupils":null}},"pupils":1739},{"universities":{"Первый МГМУ имени Сеченова":0.02857142857142857,"РАНХиГС при Президенте РФ":0.02857142857142857,"МГУ":0.38095238095238093,"НИУ ВШЭ":0.14285714285714285,"МГТУ имени Баумана":0.047619047619047616},"name":"Гимназия №1514","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":4.4,"pupils":19},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":4.7,"pupils":6},"Английский":{"grade":4.7,"pupils":70},"Химия":{"grade":4.2,"pupils":18},"Математика":{"grade":4.8,"pupils":103},"Французский":{"grade":5,"pupils":1},"Литература":{"grade":4.8,"pupils":4},"Информатика":{"grade":4.9,"pupils":43},"География":{"grade":4.6,"pupils":12},"Русский":{"grade":4.8,"pupils":101}},"year":2015,"report":"http://gym1514uz.mskobr.ru/files/Public_doclad/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.pdf","coordinates":{"latitude":55.685056,"longitude":37.526816},"ege":{"Физика":{"grade":79,"pupils":27},"Обществознание":{"grade":76,"pupils":36},"История":{"grade":67,"pupils":25},"Биология":{"grade":87,"pupils":6},"Химия":{"grade":77,"pupils":8},"Литература":{"grade":70,"pupils":10},"Английский":{"grade":85,"pupils":8},"Математика":{"grade":84,"pupils":63},"Информатика":{"grade":79,"pupils":25},"Русский":{"grade":88,"pupils":93}},"pupils":1046},{"universities":{"Финансовый университет":0.05172413793103448,"РАНХиГС при Президенте РФ":0.10344827586206896,"МГУ":0.3275862068965517,"МИРЭА":0.034482758620689655,"МГИМО":0.034482758620689655},"name":"Гимназия №1532","gia":{"Физика":{"grade":3.8,"pupils":11},"Обществознание":{"grade":3.7,"pupils":61},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.6,"pupils":21},"Английский":{"grade":3.8,"pupils":8},"Химия":{"grade":4.3,"pupils":13},"Математика":{"grade":3.6,"pupils":200},"Французский":{"grade":4,"pupils":27},"Литература":{"grade":3,"pupils":3},"Информатика":{"grade":4.1,"pupils":26},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":3.9,"pupils":200}},"year":2015,"report":"http://gym1532uz.mskobr.ru/files/attach_files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%BE%D1%82%D1%87%D0%B5%D1%82.%20%20%D0%94%D0%BE%D1%88%D0%BA%D0%BE%D0%BB%D1%8C%D0%BD%D0%BE%D0%B5%20%D0%BE%D1%82%D0%B4%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5%202014-2015.pdf","coordinates":{"latitude":55.622207,"longitude":37.491566},"ege":{},"pupils":2200},{"universities":{"РГУНГ имени Губкина":0.030927835051546393,"Финансовый университет":0.07216494845360824,"МГУ":0.3711340206185567,"НИУ ВШЭ":0.041237113402061855,"МГТУ имени Баумана":0.061855670103092786},"name":"Гимназия №1534","gia":{"Физика":{"grade":4,"pupils":89},"Обществознание":{"grade":4.1,"pupils":46},"История":{"grade":4.2,"pupils":5},"Биология":{"grade":4,"pupils":29},"Химия":{"grade":4.4,"pupils":28},"Математика":{"grade":4.2,"pupils":239},"Английский":{"grade":4.2,"pupils":29},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":4.6,"pupils":111},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.3,"pupils":238}},"year":2014,"report":"http://gym1534uz.mskobr.ru/report/","coordinates":{"latitude":55.685092,"longitude":37.574327},"ege":{"Физика":{"grade":61,"pupils":47},"Обществознание":{"grade":64,"pupils":76},"История":{"grade":50,"pupils":16},"Биология":{"grade":70,"pupils":21},"Химия":{"grade":68,"pupils":18},"Литература":{"grade":60,"pupils":9},"Английский":{"grade":66,"pupils":37},"Математика":{"grade":56,"pupils":156},"Информатика":{"grade":69,"pupils":15},"География":{"grade":71,"pupils":4},"Русский":{"grade":74,"pupils":154}},"pupils":2265},{"universities":{"РГУНГ имени Губкина":0.05128205128205128,"Финансовый университет":0.05128205128205128,"МАДИ":0.05128205128205128,"МГУ":0.358974358974359,"РАНХиГС при Президенте РФ":0.05128205128205128},"name":"Лицей №1561","gia":{"Физика":{"grade":3.9,"pupils":13},"Обществознание":{"grade":3.7,"pupils":69},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.8,"pupils":22},"Химия":{"grade":4.3,"pupils":12},"Математика":{"grade":3.8,"pupils":162},"Английский":{"grade":4.2,"pupils":39},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.2,"pupils":30},"География":{"grade":3.4,"pupils":11},"Русский":{"grade":4.1,"pupils":162}},"year":2015,"report":"http://lyc1561uz.mskobr.ru/files/public-report-2014-2015.pdf","coordinates":{"latitude":55.601828,"longitude":37.543587},"ege":{},"pupils":2360},{"universities":{"Финансовый университет":0.029411764705882353,"РЭУ имени Плеханова":0.058823529411764705,"МГУ":0.47058823529411764,"РУДН":0.058823529411764705,"МАИ":0.058823529411764705},"name":"Школа №705","gia":{"Физика":{"grade":3.8,"pupils":20},"Обществознание":{"grade":3.5,"pupils":28},"История":{"grade":3.6,"pupils":11},"Биология":{"grade":3.4,"pupils":18},"Химия":{"grade":3.3,"pupils":13},"Математика":{"grade":3.7,"pupils":111},"Английский":{"grade":4.5,"pupils":10},"Литература":{"grade":3.8,"pupils":4},"Информатика":{"grade":4.2,"pupils":15},"География":{"grade":3.2,"pupils":10},"Русский":{"grade":4,"pupils":109}},"year":2015,"report":"http://sch705sz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%D1%88%D0%BA%D0%BE%D0%BB%D1%8B%20%D0%B7%D0%B0%202014-2015.pdf","coordinates":{"latitude":55.802305,"longitude":37.394934},"ege":{},"pupils":1260},{"universities":{"АФСБ РФ":0.024390243902439025,"Финансовый университет":0.04878048780487805,"МГУ":0.3902439024390244,"ВНИИА Россельхозакадемии":0.024390243902439025,"СЭИ":0.024390243902439025},"name":"Школа №827","gia":{"Физика":{"grade":3.6,"pupils":14},"Обществознание":{"grade":3.8,"pupils":33},"История":{"grade":4,"pupils":3},"Биология":{"grade":3.9,"pupils":15},"Английский":{"grade":4.4,"pupils":9},"Химия":{"grade":4.4,"pupils":15},"Математика":{"grade":3.8,"pupils":114},"Французский":{"grade":4.3,"pupils":3},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.4,"pupils":8},"География":{"grade":4.8,"pupils":5},"Русский":{"grade":4,"pupils":115}},"year":2015,"report":"http://sch827sz.mskobr.ru/report/","coordinates":{"latitude":55.855022,"longitude":37.413277},"ege":{},"pupils":1100},{"universities":{"МГПУ":0.04,"РАНХиГС при Президенте РФ":0.06,"МГУ":0.28,"НИУ ВШЭ":0.04,"МАИ":0.04},"name":"Школа №1210","gia":{"Физика":{"grade":4.3,"pupils":4},"Обществознание":{"grade":3.9,"pupils":25},"Биология":{"grade":3,"pupils":1},"Химия":{"grade":5,"pupils":3},"Математика":{"grade":3.9,"pupils":103},"Английский":{"grade":4.6,"pupils":57},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":5,"pupils":2},"География":{"grade":4.3,"pupils":3},"Немецкий":{"grade":4,"pupils":2},"Русский":{"grade":4.2,"pupils":103}},"year":2015,"report":"http://sch1210sz.mskobr.ru/files/%2B%D0%BE%D1%82%D1%87%D0%B5%D1%82%2B14-15.compressed.pdf","coordinates":{"latitude":55.800195,"longitude":37.457124},"ege":{},"pupils":1400},{"universities":{"Юринфор":0.03571428571428571,"Финансовый университет":0.03571428571428571,"Первый МГМУ имени Сеченова":0.03571428571428571,"МГУ":0.42857142857142855,"ГУМФ":0.03571428571428571},"name":"Школа №1212","gia":{"Физика":{"grade":3.7,"pupils":3},"Обществознание":{"grade":3.5,"pupils":21},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3,"pupils":3},"Химия":{"grade":4.5,"pupils":4},"Математика":{"grade":4,"pupils":54},"Английский":{"grade":4.1,"pupils":8},"Литература":{"grade":3.7,"pupils":3},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":3.8,"pupils":36},"Русский":{"grade":4.1,"pupils":53}},"year":2015,"report":"http://sch1212.mskobr.ru/files/rezul_taty_uchebnoj_raboty_v_2014-2015_uchebnom_godu.pdf","coordinates":{"latitude":55.799133,"longitude":37.487164},"ege":{},"pupils":860},{"universities":{"Финансовый университет":0.04,"РЭУ имени Плеханова":0.12,"ВГИК":0.04,"МГУ":0.36,"МГХПА имени Строганова":0.04},"name":"Школа №1286","gia":{"Физика":{"grade":3.8,"pupils":17},"Обществознание":{"grade":4.1,"pupils":28},"Биология":{"grade":3.7,"pupils":7},"Французский":{"grade":4.3,"pupils":14},"Химия":{"grade":4,"pupils":4},"Английский":{"grade":4.3,"pupils":9},"Математика":{"grade":3.6,"pupils":176},"Информатика":{"grade":4,"pupils":5},"Русский":{"grade":3.9,"pupils":174}},"year":2015,"report":"http://sch1286sz.mskobr.ru/files/publichyj_doklad_14-15.pdf","coordinates":{"latitude":55.856694,"longitude":37.42686},"ege":{},"pupils":3080},{"universities":{"АГПС":0.02631578947368421,"МАДИ":0.05263157894736842,"МГУ":0.3157894736842105,"МАрхИ":0.05263157894736842,"МГТУ имени Баумана":0.05263157894736842},"name":"Школа №1900","gia":{"Физика":{"grade":4.3,"pupils":3},"Обществознание":{"grade":3.9,"pupils":57},"История":{"grade":3.8,"pupils":4},"Биология":{"grade":3.9,"pupils":16},"Английский":{"grade":4.7,"pupils":42},"Химия":{"grade":4.7,"pupils":11},"Математика":{"grade":3.8,"pupils":143},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.1,"pupils":8},"Русский":{"grade":4.1,"pupils":143}},"year":2015,"report":"http://sch1900sz.mskobr.ru/files/%20%D1%80%D1%83%D0%BA%D0%BE%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D0%B5%D0%BB%D1%8F___2014-2015.pdf","coordinates":{"latitude":55.841397,"longitude":37.361211},"ege":{},"pupils":1640},{"universities":{"Финансовый университет":0.03389830508474576,"МГИМО":0.1694915254237288,"ВАВТ":0.03389830508474576,"МГУ":0.3389830508474576,"НИУ ВШЭ":0.06779661016949153},"name":"Школа №1944","gia":{"Физика":{"grade":3.6,"pupils":34},"Обществознание":{"grade":4.3,"pupils":36},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.1,"pupils":15},"Английский":{"grade":4.7,"pupils":49},"Химия":{"grade":4.5,"pupils":13},"Математика":{"grade":4.2,"pupils":122},"Французский":{"grade":3,"pupils":1},"Литература":{"grade":4.6,"pupils":5},"Информатика":{"grade":4.4,"pupils":11},"География":{"grade":4,"pupils":3},"Русский":{"grade":4.4,"pupils":121}},"year":2015,"report":"http://schusz1944.mskobr.ru/files/publichnyj_doklad_rukovoditelya_gosudarstvennogo_byudzhtnogo_obweobrazovatel_nogo_uchrezhdeniya_goroda_moskvy.docx","coordinates":{"latitude":55.842267,"longitude":37.349722},"ege":{"Физика":{"grade":63,"pupils":null},"Обществознание":{"grade":71,"pupils":null},"История":{"grade":57,"pupils":null},"Биология":{"grade":79,"pupils":null},"Химия":{"grade":78,"pupils":null},"Литература":{"grade":74,"pupils":null},"Английский":{"grade":84,"pupils":null},"Математика":{"grade":69,"pupils":null},"Информатика":{"grade":58,"pupils":null},"География":{"grade":77,"pupils":null},"Русский":{"grade":84,"pupils":null}},"pupils":2280},{"universities":{"МГУДТ":0.024390243902439025,"Финансовый университет":0.0975609756097561,"МГЛУ":0.024390243902439025,"МГУ":0.3170731707317073,"МФПУ Синергия":0.036585365853658534},"name":"Гимназия №1619 имени Цветаевой","gia":{"Физика":{"grade":3.5,"pupils":6},"Обществознание":{"grade":3.5,"pupils":67},"История":{"grade":3.5,"pupils":6},"Биология":{"grade":3.6,"pupils":19},"Английский":{"grade":4.1,"pupils":37},"Химия":{"grade":4,"pupils":14},"Математика":{"grade":3.4,"pupils":193},"Французский":{"grade":3.6,"pupils":5},"Литература":{"grade":3.4,"pupils":5},"Информатика":{"grade":4,"pupils":23},"География":{"grade":3.6,"pupils":8},"Русский":{"grade":3.9,"pupils":192}},"year":2015,"report":"http://co1619.mskobr.ru/report/","coordinates":{"latitude":55.797063,"longitude":37.40486},"ege":{},"pupils":2260},{"universities":{"Финансовый университет":0.02127659574468085,"РЭУ имени Плеханова":0.0425531914893617,"РАНХиГС при Президенте РФ":0.06382978723404255,"МГУ":0.425531914893617,"МФЮА":0.06382978723404255},"name":"Школа №1981","gia":{"Физика":{"grade":3.8,"pupils":25},"Обществознание":{"grade":3.9,"pupils":33},"История":{"grade":2,"pupils":1},"Биология":{"grade":4.1,"pupils":12},"Английский":{"grade":3.5,"pupils":16},"Химия":{"grade":4,"pupils":16},"Французский":{"grade":3,"pupils":1},"Математика":{"grade":3.9,"pupils":167},"Информатика":{"grade":4.1,"pupils":7},"География":{"grade":5,"pupils":1},"Русский":{"grade":3.9,"pupils":169}},"year":2015,"report":"http://sch1981uz.mskobr.ru/files/samoobsledovanie_gbou_shkola_1981_2014-2015.pdf","coordinates":{"latitude":55.549322,"longitude":37.530076},"ege":{},"pupils":2140},{"universities":{"Финансовый университет":0.030303030303030304,"НИЯУ МИФИ":0.06060606060606061,"МГУ":0.5,"НИУ ВШЭ":0.06060606060606061,"МГТУ имени Баумана":0.06060606060606061},"name":"Школа №2007","gia":{"Физика":{"grade":4.3,"pupils":77},"Биология":{"grade":4,"pupils":1},"Химия":{"grade":3,"pupils":1},"Английский":{"grade":5,"pupils":1},"Математика":{"grade":4.9,"pupils":81},"Информатика":{"grade":4,"pupils":1},"Русский":{"grade":4.7,"pupils":80}},"year":2014,"report":"http://schuuz2007.mskobr.ru/report/","coordinates":{"latitude":55.544749,"longitude":37.532771},"ege":{"Физика":{"grade":81,"pupils":36},"Обществознание":{"grade":65,"pupils":6},"Английский":{"grade":70,"pupils":9},"Математика":{"grade":85,"pupils":44},"Информатика":{"grade":75,"pupils":23},"Русский":{"grade":83,"pupils":44}},"pupils":489},{"universities":{"МЭИ":0.045454545454545456,"МГППУ":0.030303030303030304,"МГТУ имени Баумана":0.030303030303030304,"МГУ":0.45454545454545453,"РХТУ имени Менделеева":0.045454545454545456},"name":"Школа №171","gia":{"Физика":{"grade":4.3,"pupils":3},"Обществознание":{"grade":4,"pupils":3},"История":{"grade":3.1,"pupils":9},"Биология":{"grade":4.3,"pupils":3},"Химия":{"grade":4.8,"pupils":4},"Английский":{"grade":4,"pupils":14},"Математика":{"grade":4.5,"pupils":79},"Информатика":{"grade":4.7,"pupils":27},"География":{"grade":4.5,"pupils":4},"Русский":{"grade":4.3,"pupils":79}},"year":2014,"report":"http://sch171c.mskobr.ru/files/publichnyj_doklad_direktora.pdf","coordinates":{"latitude":55.722223,"longitude":37.57943},"ege":{"Физика":{"grade":56,"pupils":22},"Обществознание":{"grade":57,"pupils":22},"История":{"grade":53,"pupils":5},"Биология":{"grade":71,"pupils":34},"Химия":{"grade":70,"pupils":40},"Литература":{"grade":67,"pupils":4},"Английский":{"grade":66,"pupils":13},"Математика":{"grade":52,"pupils":87},"Информатика":{"grade":59,"pupils":11},"География":{"grade":64,"pupils":3},"Русский":{"grade":73,"pupils":87}},"pupils":1253},{"universities":{"Финансовый университет":0.07692307692307693,"Первый МГМУ имени Сеченова":0.07692307692307693,"РЭУ имени Плеханова":0.07692307692307693,"МГУ":0.15384615384615385,"МГТУ имени Баумана":0.07692307692307693},"name":"Школа №1284","gia":{"Физика":{"grade":3.6,"pupils":5},"Обществознание":{"grade":3.5,"pupils":22},"История":{"grade":2.7,"pupils":3},"Биология":{"grade":3.5,"pupils":4},"Химия":{"grade":3.2,"pupils":6},"Математика":{"grade":4.2,"pupils":88},"Английский":{"grade":4.3,"pupils":60},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.4,"pupils":8},"География":{"grade":5,"pupils":1},"Немецкий":{"grade":3.5,"pupils":4},"Русский":{"grade":4.3,"pupils":88}},"year":2014,"report":"http://sch1284.mskobr.ru/report/","coordinates":{"latitude":55.767686,"longitude":37.638377},"ege":{},"pupils":1200},{"universities":{"Финансовый университет":0.05,"РЭУ имени Плеханова":0.075,"МГУ":0.1,"ВАВТ":0.075,"МГТУ имени Баумана":0.05},"name":"Лицей №1574","gia":{"Физика":{"grade":4,"pupils":24},"Обществознание":{"grade":4.2,"pupils":23},"История":{"grade":3.4,"pupils":7},"Биология":{"grade":4.2,"pupils":33},"Химия":{"grade":4.8,"pupils":27},"Английский":{"grade":4,"pupils":19},"Математика":{"grade":4,"pupils":143},"Информатика":{"grade":4.6,"pupils":12},"География":{"grade":3,"pupils":1},"Русский":{"grade":4.3,"pupils":143}},"year":2014,"report":"http://lyc1574.mskobr.ru/files/pupl_doklad_1574-2013-2014.pdf","coordinates":{"latitude":55.779737,"longitude":37.596965},"ege":{"Физика":{"grade":57,"pupils":23},"Обществознание":{"grade":75,"pupils":46},"История":{"grade":70,"pupils":19},"Биология":{"grade":84,"pupils":18},"Химия":{"grade":84,"pupils":20},"Литература":{"grade":68,"pupils":1},"Английский":{"grade":73,"pupils":44},"Математика":{"grade":62,"pupils":94},"Информатика":{"grade":67,"pupils":6},"География":{"grade":65,"pupils":2},"Русский":{"grade":78,"pupils":94}},"pupils":1557},{"universities":{"РУДН":0.01680672268907563,"МФТИ":0.04201680672268908,"МГУ":0.23529411764705882,"НИУ ВШЭ":0.03361344537815126,"МГТУ имени Баумана":0.46218487394957986},"name":"Лицей №1581","gia":{"Физика":{"grade":4.3,"pupils":70},"Французский":{"grade":3,"pupils":1},"Химия":{"grade":5,"pupils":1},"Математика":{"grade":4.7,"pupils":71},"Английский":{"grade":4.5,"pupils":14},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.5,"pupils":53},"Русский":{"grade":4.5,"pupils":71}},"year":2015,"report":"http://lycc1581.mskobr.ru/images/cms/data/publichnyj_doklad_2013-2014_tverskoj.pdf","coordinates":{"latitude":55.752607,"longitude":37.663243},"ege":{},"pupils":1860},{"universities":{"Финансовый университет":0.03,"МГИМО":0.04,"РАНХиГС при Президенте РФ":0.05,"МГУ":0.33,"НИУ ВШЭ":0.03},"name":"Школа №88","gia":{"Физика":{"grade":3,"pupils":2},"Обществознание":{"grade":3.8,"pupils":8},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.3,"pupils":4},"Английский":{"grade":4.4,"pupils":17},"Математика":{"grade":3.7,"pupils":72},"Французский":{"grade":5,"pupils":1},"Литература":{"grade":3.3,"pupils":3},"Информатика":{"grade":4,"pupils":2},"Русский":{"grade":4.2,"pupils":72}},"year":2014,"report":"http://sch88c.mskobr.ru/files/Publ_Doklad_Directora_2013-2014.pdf","coordinates":{"latitude":55.736969,"longitude":37.68191},"ege":{},"pupils":4560},{"universities":{"Финансовый университет":0.02857142857142857,"АМИ":0.01987577639751553,"АГЗ МЧС России":0.02608695652173913,"МГУ":0.6571428571428571,"АПИ при ИГиП РАН":0.034782608695652174},"name":"Школа №17","gia":{},"year":2014,"report":"http://sch17uz.mskobr.ru/files/publichnyj_doklad_20141.docx","coordinates":{"latitude":55.666929,"longitude":37.549633},"ege":{"Физика":{"grade":54,"pupils":null},"Обществознание":{"grade":64,"pupils":null},"История":{"grade":56,"pupils":null},"Биология":{"grade":76,"pupils":null},"Химия":{"grade":59,"pupils":null},"Литература":{"grade":72,"pupils":null},"Английский":{"grade":76,"pupils":null},"Математика":{"grade":53,"pupils":null},"Информатика":{"grade":50,"pupils":null},"География":{"grade":67,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":518},{"universities":{"МЭИ":0.05454545454545454,"Финансовый университет":0.03636363636363636,"РАНХиГС при Президенте РФ":0.05454545454545454,"МГУ":0.2909090909090909,"МГТУ Станкин":0.03636363636363636},"name":"Школа №1236","gia":{"Физика":{"grade":3.9,"pupils":9},"Обществознание":{"grade":3.9,"pupils":88},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4,"pupils":21},"Английский":{"grade":4.3,"pupils":65},"Химия":{"grade":3.8,"pupils":45},"Математика":{"grade":3.6,"pupils":296},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3.5,"pupils":6},"Информатика":{"grade":4.4,"pupils":15},"География":{"grade":3.9,"pupils":16},"Русский":{"grade":3.9,"pupils":297}},"year":2015,"report":"http://sch1236sv.mskobr.ru/report/","coordinates":{"latitude":55.817426,"longitude":37.582403},"ege":{},"pupils":3300},{"universities":{"МПГУ":0.05454545454545454,"Финансовый университет":0.03636363636363636,"МГУ":0.18181818181818182,"НИУ ВШЭ":0.07272727272727272,"МГТУ имени Баумана":0.05454545454545454},"name":"Школа №1412","gia":{"Физика":{"grade":4,"pupils":19},"Обществознание":{"grade":4,"pupils":30},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.3,"pupils":3},"Химия":{"grade":4.7,"pupils":9},"Математика":{"grade":3.7,"pupils":105},"Английский":{"grade":4.2,"pupils":32},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":3.9,"pupils":7},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":3.7,"pupils":3},"Русский":{"grade":4.2,"pupils":104}},"year":2015,"report":"http://sch1412sv.mskobr.ru/report/","coordinates":{"latitude":55.890977,"longitude":37.60169},"ege":{},"pupils":1040},{"universities":{"Финансовый университет":0.03125,"МЭСИ":0.03125,"МАМИ":0.0625,"МГУ":0.40625,"МГТУ Станкин":0.03125},"name":"Школа №1416","gia":{"Физика":{"grade":3.5,"pupils":4},"Обществознание":{"grade":3.9,"pupils":25},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.4,"pupils":7},"Химия":{"grade":3.6,"pupils":7},"Математика":{"grade":3.5,"pupils":149},"Английский":{"grade":4,"pupils":24},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.5,"pupils":4},"География":{"grade":4,"pupils":2},"Русский":{"grade":3.9,"pupils":149}},"year":2015,"report":"http://sch1416sv.mskobr.ru/files/%20%D0%BF%D0%BE%20%D1%81%D0%B0%D0%BC%D0%BE%D0%BE%D0%B1%D1%81%D0%BB%D0%B5%D0%B4%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8E%201416.pdf","coordinates":{"latitude":55.893445,"longitude":37.581388},"ege":{},"pupils":1960},{"universities":{"МЭИ":0.05263157894736842,"Финансовый университет":0.05263157894736842,"РАНХиГС при Президенте РФ":0.05263157894736842,"МГУ":0.47368421052631576,"МГИМО":0.05263157894736842},"name":"Школа №1955","gia":{"Физика":{"grade":3.8,"pupils":6},"Обществознание":{"grade":3.7,"pupils":42},"История":{"grade":3.5,"pupils":8},"Биология":{"grade":3.3,"pupils":12},"Химия":{"grade":4.6,"pupils":9},"Математика":{"grade":3.8,"pupils":194},"Английский":{"grade":4.4,"pupils":72},"Литература":{"grade":4.2,"pupils":19},"Информатика":{"grade":4.3,"pupils":6},"География":{"grade":4.4,"pupils":5},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":198}},"year":2014,"report":"http://sch1955sv.mskobr.ru/files/dokumenty/lokal/otchet1314.pdf","coordinates":{"latitude":55.884822,"longitude":37.683266},"ege":{"Физика":{"grade":53,"pupils":null},"Обществознание":{"grade":53,"pupils":null},"История":{"grade":49,"pupils":null},"Биология":{"grade":60,"pupils":null},"Химия":{"grade":52,"pupils":null},"Литература":{"grade":57,"pupils":null},"Английский":{"grade":64,"pupils":null},"Математика":{"grade":45,"pupils":null},"Информатика":{"grade":56,"pupils":null},"География":{"grade":60,"pupils":null},"Немецкий":{"grade":61,"pupils":null},"Русский":{"grade":68,"pupils":null}},"pupils":2182},{"universities":{"Финансовый университет":0.056179775280898875,"МГТУ МИРЭА":0.02247191011235955,"РЭУ имени Плеханова":0.02247191011235955,"МГУ":0.39325842696629215,"МГТУ имени Баумана":0.033707865168539325},"name":"Гимназия №1554","gia":{"Физика":{"grade":3.7,"pupils":19},"Обществознание":{"grade":3.7,"pupils":57},"История":{"grade":3,"pupils":6},"Биология":{"grade":3.8,"pupils":17},"Химия":{"grade":4.5,"pupils":25},"Математика":{"grade":4.2,"pupils":136},"Английский":{"grade":4.2,"pupils":40},"Литература":{"grade":4.2,"pupils":11},"Информатика":{"grade":4,"pupils":21},"География":{"grade":3.8,"pupils":12},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.2,"pupils":136}},"year":2014,"report":"http://gym1554.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%281%29.pdf","coordinates":{"latitude":55.864439,"longitude":37.613485},"ege":{"Физика":{"grade":52,"pupils":31},"Обществознание":{"grade":61,"pupils":55},"История":{"grade":57,"pupils":19},"Биология":{"grade":63,"pupils":16},"Химия":{"grade":72,"pupils":6},"Литература":{"grade":71,"pupils":11},"Английский":{"grade":63,"pupils":39},"Математика":{"grade":51,"pupils":103},"Информатика":{"grade":69,"pupils":20},"География":{"grade":64,"pupils":2},"Немецкий":{"grade":63,"pupils":1},"Русский":{"grade":74,"pupils":103}},"pupils":1650},{"universities":{"Финансовый университет":0.041666666666666664,"東京電機大学 (Tokyo Denki University)":0.041666666666666664,"МГУ":0.3333333333333333,"НИУ ВШЭ":0.16666666666666666,"МГТУ имени Баумана":0.25},"name":"Лицей №1537","gia":{"Физика":{"grade":4.5,"pupils":47},"Обществознание":{"grade":3.6,"pupils":30},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.7,"pupils":9},"Химия":{"grade":4.6,"pupils":5},"Математика":{"grade":4.2,"pupils":148},"Английский":{"grade":4.3,"pupils":20},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.7,"pupils":57},"География":{"grade":4.2,"pupils":5},"Русский":{"grade":4.1,"pupils":145}},"year":2014,"report":"http://lyc1537.mskobr.ru/files/licej1537_publichnyj_doklad_direktora.docx","coordinates":{"latitude":55.874258,"longitude":37.719172},"ege":{"Физика":{"grade":58,"pupils":48},"Обществознание":{"grade":61,"pupils":53},"История":{"grade":62,"pupils":14},"Биология":{"grade":52,"pupils":8},"Химия":{"grade":71,"pupils":2},"Литература":{"grade":62,"pupils":9},"Английский":{"grade":75,"pupils":27},"Математика":{"grade":63,"pupils":104},"Информатика":{"grade":69,"pupils":26},"Русский":{"grade":76,"pupils":105}},"pupils":1261},{"universities":{"Финансовый университет":0.022727272727272728,"МГУПИ":0.06818181818181818,"МГУ":0.5681818181818182,"МГИМТ":0.022727272727272728,"МосАП при Правительстве Москвы":0.022727272727272728},"name":"Школа №319","gia":{"Физика":{"grade":3.5,"pupils":6},"Обществознание":{"grade":3.7,"pupils":45},"История":{"grade":3.4,"pupils":8},"Биология":{"grade":3.6,"pupils":29},"Химия":{"grade":4.1,"pupils":11},"Математика":{"grade":3.3,"pupils":168},"Английский":{"grade":4,"pupils":9},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.2,"pupils":26},"География":{"grade":3.6,"pupils":7},"Русский":{"grade":3.9,"pupils":166}},"year":2015,"report":"http://sch319v.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.806651,"longitude":37.759803},"ege":{},"pupils":1940},{"universities":{"МИГУП":0.047619047619047616,"Финансовый университет":0.047619047619047616,"РЭУ имени Плеханова":0.047619047619047616,"МГУ":0.3333333333333333,"МИЭТ":0.07142857142857142},"name":"Школа №618","gia":{"Физика":{"grade":3.9,"pupils":13},"Обществознание":{"grade":3.7,"pupils":33},"Биология":{"grade":3.5,"pupils":11},"Химия":{"grade":3.8,"pupils":16},"Математика":{"grade":3.6,"pupils":105},"Английский":{"grade":4.3,"pupils":20},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.3,"pupils":13},"География":{"grade":3,"pupils":1},"Русский":{"grade":3.9,"pupils":108}},"year":2015,"report":"http://sch618zg.mskobr.ru/files/pd2015.pdf","coordinates":{"latitude":55.993877,"longitude":37.207653},"ege":{},"pupils":1960},{"universities":{"РХТУ имени Менделеева":0.0392156862745098,"МФТИ":0.058823529411764705,"МГУ":0.23529411764705882,"НИУ ВШЭ":0.058823529411764705,"МИЭТ":0.19607843137254902},"name":"Школа №853","gia":{"Физика":{"grade":4.1,"pupils":33},"Обществознание":{"grade":4.3,"pupils":23},"Биология":{"grade":3.8,"pupils":13},"Химия":{"grade":4.6,"pupils":19},"Математика":{"grade":4,"pupils":131},"Английский":{"grade":4.2,"pupils":20},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.5,"pupils":29},"Русский":{"grade":4.1,"pupils":130}},"year":2015,"report":"http://sch853zg.mskobr.ru/files/publdokl_2015_1.pdf","coordinates":{"latitude":55.984975,"longitude":37.192202},"ege":{"Математика":{"grade":65,"pupils":null},"Русский":{"grade":73,"pupils":null}},"pupils":1748},{"universities":{"РУДН":0.025,"Первый МГМУ имени Сеченова":0.05,"РАНХиГС при Президенте РФ":0.05,"МГУ":0.575,"ГУУ":0.05},"name":"Школа №2026","gia":{"Физика":{"grade":3.9,"pupils":9},"Обществознание":{"grade":3.7,"pupils":21},"История":{"grade":3,"pupils":2},"Биология":{"grade":3.7,"pupils":7},"Химия":{"grade":4.3,"pupils":11},"Математика":{"grade":3.7,"pupils":55},"Английский":{"grade":4,"pupils":6},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.4,"pupils":10},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.3,"pupils":55}},"year":2015,"report":"http://sch2026v.mskobr.ru/files/%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.docx","coordinates":{"latitude":55.717366,"longitude":37.883671},"ege":{},"pupils":1900},{"universities":{"РЭУ имени Плеханова":0.047619047619047616,"Первый МГМУ имени Сеченова":0.047619047619047616,"АУ МВД РФ":0.047619047619047616,"МГУ":0.2857142857142857,"ГУУ":0.09523809523809523},"name":"Школа №2036","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":3.9,"pupils":46},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.9,"pupils":13},"Химия":{"grade":4,"pupils":13},"Английский":{"grade":4.2,"pupils":36},"Математика":{"grade":4,"pupils":177},"Информатика":{"grade":4.4,"pupils":43},"География":{"grade":3.9,"pupils":11},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.2,"pupils":177}},"year":2015,"report":"http://sch2036v.mskobr.ru/files/publichnyj_doklad_2014-2015_na_sajt.pdf","coordinates":{"latitude":55.710484,"longitude":37.887049},"ege":{},"pupils":1540},{"universities":{"НИТУ МИСиС":0.05555555555555555,"Финансовый университет":0.037037037037037035,"РАНХиГС при Президенте РФ":0.037037037037037035,"МГУ":0.37037037037037035,"МИЭТ":0.09259259259259259},"name":"Школа №1151","gia":{"Физика":{"grade":3.8,"pupils":23},"Обществознание":{"grade":3.7,"pupils":69},"Биология":{"grade":3.3,"pupils":10},"Химия":{"grade":4,"pupils":14},"Математика":{"grade":3.3,"pupils":183},"Английский":{"grade":4.5,"pupils":2},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.3,"pupils":3},"География":{"grade":4,"pupils":2},"Русский":{"grade":3.7,"pupils":183}},"year":2015,"report":"http://sch1151zg.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%D1%88%D0%BA%D0%BE%D0%BB%D1%8B%202015%D0%B3%D0%BE%D0%B4%D0%B0%282%29.pdf","coordinates":{"latitude":55.987442,"longitude":37.155614},"ege":{},"pupils":1640},{"universities":{},"name":"Лицей №1557","gia":{"Физика":{"grade":4,"pupils":88},"Обществознание":{"grade":3.8,"pupils":53},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":12},"Химия":{"grade":3.8,"pupils":14},"Английский":{"grade":4.1,"pupils":20},"Математика":{"grade":4.2,"pupils":194},"Информатика":{"grade":4,"pupils":9},"География":{"grade":5,"pupils":1},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.2,"pupils":194}},"year":2015,"report":"http://lyc1557zg.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-15_8.pdf","coordinates":{"latitude":55.998,"longitude":37.231566},"ege":{"Математика":{"grade":66,"pupils":null},"Русский":{"grade":80,"pupils":null}},"pupils":1890},{"universities":{"МЭИ":0.08333333333333333,"МГИУ":0.041666666666666664,"SSE Russia":0.041666666666666664,"РАНХиГС при Президенте РФ":0.08333333333333333,"МГУ":0.3333333333333333},"name":"Школа №1269","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":3.6,"pupils":7},"История":{"grade":5,"pupils":2},"Биология":{"grade":3.7,"pupils":6},"Химия":{"grade":5,"pupils":4},"Английский":{"grade":4.8,"pupils":8},"Математика":{"grade":3.6,"pupils":132},"Информатика":{"grade":4.8,"pupils":8},"География":{"grade":3.5,"pupils":2},"Немецкий":{"grade":3.9,"pupils":17},"Русский":{"grade":4,"pupils":132}},"year":2015,"report":"http://sch1269v.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202015.pdf","coordinates":{"latitude":55.754993,"longitude":37.786267},"ege":{},"pupils":1680},{"universities":{"Финансовый университет":0.05128205128205128,"МЭСИ":0.05128205128205128,"МГЮА имени Кутафина":0.02564102564102564,"МГУ":0.358974358974359,"ГУУ":0.05128205128205128},"name":"Школа №1324","gia":{"Физика":{"grade":3.4,"pupils":22},"Обществознание":{"grade":3.5,"pupils":38},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.8,"pupils":4},"Английский":{"grade":4.1,"pupils":42},"Химия":{"grade":3.5,"pupils":4},"Математика":{"grade":3.6,"pupils":203},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.3,"pupils":10},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":4,"pupils":203}},"year":2015,"report":"http://sch1324.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%D0%BE%D0%BA%D0%BE%D0%BD%D1%87..docx","coordinates":{"latitude":55.754856,"longitude":37.820196},"ege":{},"pupils":2340},{"universities":{"МПГУ":0.05,"Финансовый университет":0.06666666666666667,"РАНХиГС при Президенте РФ":0.05,"МГУ":0.3333333333333333,"НИУ ВШЭ":0.05},"name":"Измайловская гимназия №1508","gia":{"Физика":{"grade":3.4,"pupils":13},"Обществознание":{"grade":4,"pupils":35},"История":{"grade":3.8,"pupils":5},"Биология":{"grade":3.8,"pupils":8},"Химия":{"grade":4.5,"pupils":6},"Математика":{"grade":3.8,"pupils":111},"Английский":{"grade":4.5,"pupils":35},"Литература":{"grade":4.8,"pupils":5},"Информатика":{"grade":4,"pupils":6},"Испанский":{"grade":4,"pupils":1},"География":{"grade":4.1,"pupils":14},"Русский":{"grade":4.3,"pupils":111}},"year":2015,"report":"http://gym1508.mskobr.ru/files/publichnyj_otchet_1508_24_08_15.pdf","coordinates":{"latitude":55.793768,"longitude":37.795636},"ege":{},"pupils":1820},{"universities":{"Финансовый университет":0.07058823529411765,"АПИ при ИГиП РАН":0.047058823529411764,"РАНХиГС при Президенте РФ":0.047058823529411764,"МГУ":0.25882352941176473,"МГТУ имени Баумана":0.07058823529411765},"name":"Гимназия №1512","gia":{"Физика":{"grade":3.7,"pupils":7},"Обществознание":{"grade":4,"pupils":39},"История":{"grade":4,"pupils":3},"Биология":{"grade":4,"pupils":3},"Химия":{"grade":4,"pupils":6},"Математика":{"grade":4.1,"pupils":76},"Английский":{"grade":4.3,"pupils":36},"Литература":{"grade":3.3,"pupils":4},"Информатика":{"grade":4,"pupils":3},"Русский":{"grade":4.2,"pupils":76}},"year":2014,"report":"http://sch1512.mskobr.ru/files/publichnyj_doklad_2013-2014.pdf","coordinates":{"latitude":55.718187,"longitude":37.830114},"ege":{},"pupils":1200},{"universities":{"Финансовый университет":0.028409090909090908,"МГИМО":0.03977272727272727,"РАНХиГС при Президенте РФ":0.05113636363636364,"МГУ":0.4772727272727273,"МГТУ имени Баумана":0.03409090909090909},"name":"Гимназия №1530","gia":{"Физика":{"grade":3.6,"pupils":12},"Обществознание":{"grade":3.9,"pupils":71},"История":{"grade":3.3,"pupils":11},"Биология":{"grade":4.1,"pupils":25},"Английский":{"grade":4.5,"pupils":51},"Химия":{"grade":4.6,"pupils":29},"Математика":{"grade":3.9,"pupils":188},"Французский":{"grade":3,"pupils":9},"Литература":{"grade":4.3,"pupils":3},"Информатика":{"grade":3.9,"pupils":14},"География":{"grade":3,"pupils":2},"Русский":{"grade":4,"pupils":191}},"year":2015,"report":"http://gym1530.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.pdf","coordinates":{"latitude":55.793141,"longitude":37.684775},"ege":{"Физика":{"grade":61,"pupils":null},"Обществознание":{"grade":66,"pupils":null},"История":{"grade":54,"pupils":null},"Биология":{"grade":65,"pupils":null},"Английский":{"grade":74,"pupils":null},"Химия":{"grade":72,"pupils":null},"Литература":{"grade":60,"pupils":null},"Французский":{"grade":85,"pupils":null},"Математика":{"grade":53,"pupils":null},"Информатика":{"grade":48,"pupils":null},"Русский":{"grade":76,"pupils":null}},"pupils":1600},{"universities":{"Финансовый университет":0.03125,"МТУСИ":0.03125,"МГУ":0.5,"ГУУ":0.0625,"МГППУ":0.03125},"name":"Гимназия №1591","gia":{"Физика":{"grade":3.6,"pupils":9},"Обществознание":{"grade":3.9,"pupils":26},"Биология":{"grade":3.6,"pupils":7},"Химия":{"grade":4.3,"pupils":16},"Английский":{"grade":4.5,"pupils":26},"Математика":{"grade":3.7,"pupils":149},"Информатика":{"grade":4.2,"pupils":13},"География":{"grade":3.7,"pupils":11},"Русский":{"grade":4,"pupils":148}},"year":2015,"report":"http://gym1591.mskobr.ru/files/publichniy_doklad_2014-15.pdf","coordinates":{"latitude":55.741809,"longitude":37.872371},"ege":{},"pupils":2020},{"universities":{"МГГУ имени Шолохова":0.03225806451612903,"МПГУ":0.0967741935483871,"Финансовый университет":0.0967741935483871,"МГУ":0.3548387096774194,"ИГУМО":0.06451612903225806},"name":"Школа №799","gia":{"Физика":{"grade":4,"pupils":9},"Обществознание":{"grade":3.4,"pupils":19},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.7,"pupils":10},"Химия":{"grade":4,"pupils":7},"Английский":{"grade":3.6,"pupils":10},"Математика":{"grade":3.5,"pupils":108},"Информатика":{"grade":4.1,"pupils":32},"Русский":{"grade":3.7,"pupils":109}},"year":2015,"report":"http://sch799v.mskobr.ru/files/_799_2014-2015.pdf","coordinates":{"latitude":55.768694,"longitude":37.825451},"ege":{},"pupils":2240},{"universities":{"Первый МГМУ имени Сеченова":0.11428571428571428,"АМИ":0.05714285714285714,"МГУ":0.3142857142857143,"МГМСУ имени Евдокимова":0.02857142857142857,"МИЭТ":0.05714285714285714},"name":"Школа №1353 имени генерала Алексеева","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":4.2,"pupils":12},"Биология":{"grade":4.5,"pupils":15},"Английский":{"grade":4.6,"pupils":23},"Химия":{"grade":4.4,"pupils":11},"Математика":{"grade":3.6,"pupils":100},"Французский":{"grade":5,"pupils":1},"Литература":{"grade":4.2,"pupils":6},"Информатика":{"grade":4.3,"pupils":9},"География":{"grade":4.5,"pupils":2},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":3.9,"pupils":100}},"year":2015,"report":"http://sch1353zg.mskobr.ru/files/PD2014-2015%281%29.pdf","coordinates":{"latitude":55.99504,"longitude":37.202641},"ege":{},"pupils":1440},{"universities":{"Финансовый университет":0.047619047619047616,"РНИМУ имени Пирогова":0.1111111111111111,"МГУ":0.20634920634920634,"НИУ ВШЭ":0.047619047619047616,"МГТУ Станкин":0.031746031746031744},"name":"Гимназия №1563","gia":{"Физика":{"grade":3.6,"pupils":7},"Обществознание":{"grade":4,"pupils":32},"История":{"grade":3,"pupils":1},"Биология":{"grade":4.3,"pupils":15},"Химия":{"grade":4.6,"pupils":17},"Математика":{"grade":4.5,"pupils":79},"Английский":{"grade":4.6,"pupils":34},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.4,"pupils":9},"Русский":{"grade":4.5,"pupils":79}},"year":2015,"report":"http://gym1563v.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%281%29.pdf","coordinates":{"latitude":55.807486,"longitude":37.810414},"ege":{},"pupils":1421},{"universities":{"Финансовый университет":0.038461538461538464,"АМИ":0.038461538461538464,"МГУ":0.2692307692307692,"РГАУ-МСХА имени Тимирязева":0.038461538461538464,"МАИ":0.07692307692307693},"name":"Школа №185 имени Гризодубовой","gia":{"Физика":{"grade":3.5,"pupils":8},"Обществознание":{"grade":3.6,"pupils":15},"История":{"grade":4,"pupils":3},"Биология":{"grade":3.8,"pupils":5},"Химия":{"grade":4.5,"pupils":2},"Математика":{"grade":3.6,"pupils":42},"Английский":{"grade":5,"pupils":1},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4,"pupils":2},"География":{"grade":3.8,"pupils":5},"Русский":{"grade":4.1,"pupils":42}},"year":2015,"report":"http://sch185s.mskobr.ru/files/PUBLIK_DOC.pdf","coordinates":{"latitude":55.836888,"longitude":37.535475},"ege":{},"pupils":520},{"universities":{"МЭСИ":0.01639344262295082,"РЭУ имени Плеханова":0.03278688524590164,"МГУПС":0.03278688524590164,"МГУ":0.5081967213114754,"РУДН":0.03278688524590164},"name":"Школа №236 имени Щедрина","gia":{"Физика":{"grade":4,"pupils":3},"Обществознание":{"grade":3.4,"pupils":26},"История":{"grade":2.3,"pupils":3},"Биология":{"grade":3.5,"pupils":10},"Химия":{"grade":3.6,"pupils":5},"Английский":{"grade":3.6,"pupils":14},"Математика":{"grade":3.3,"pupils":113},"Информатика":{"grade":4.2,"pupils":9},"География":{"grade":3,"pupils":1},"Русский":{"grade":3.9,"pupils":113}},"year":2015,"report":"http://sch236s.mskobr.ru/files/publichnyj_doklad_2014-2015_uchebnyj_god_236.doc","coordinates":{"latitude":55.884115,"longitude":37.523016},"ege":{},"pupils":2440},{"universities":{"МГТУ имени Баумана":0.0625,"МЭСИ":0.03125,"МГУПС":0.0625,"МГУ":0.25,"МАИ":0.09375},"name":"Школа №717","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":3.8,"pupils":32},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.8,"pupils":8},"Химия":{"grade":3.9,"pupils":10},"Математика":{"grade":3.3,"pupils":93},"Английский":{"grade":3.9,"pupils":10},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":3.3,"pupils":4},"Русский":{"grade":3.9,"pupils":95}},"year":2015,"report":"http://sch717s.mskobr.ru/files/%20%D0%9E%D0%A2%D0%A7%D0%81%D0%A2%202014-2015%20%D1%83%D1%87.%D0%B3%D0%BE%D0%B4.docx","coordinates":{"latitude":55.817421,"longitude":37.504861},"ege":{},"pupils":1340},{"universities":{"ВАВТ":0.058823529411764705,"РАНХиГС при Президенте РФ":0.058823529411764705,"МГУ":0.23529411764705882,"НИУ ВШЭ":0.11764705882352941,"МГЛУ":0.0784313725490196},"name":"Школа №1252 имени Сервантеса","gia":{"Физика":{"grade":5,"pupils":1},"Обществознание":{"grade":3.5,"pupils":4},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.9,"pupils":9},"Химия":{"grade":3,"pupils":1},"Математика":{"grade":3.9,"pupils":69},"Английский":{"grade":4.6,"pupils":7},"Литература":{"grade":5,"pupils":1},"Испанский":{"grade":4,"pupils":63},"Русский":{"grade":4.2,"pupils":69}},"year":2015,"report":"http://sch1252.mskobr.ru/files/Doc/Main/pdokl1415.pdf","coordinates":{"latitude":55.809975,"longitude":37.496515},"ege":{"Физика":{"grade":54,"pupils":4},"Обществознание":{"grade":67,"pupils":25},"История":{"grade":66,"pupils":13},"Биология":{"grade":66,"pupils":8},"Химия":{"grade":52,"pupils":6},"Литература":{"grade":70,"pupils":14},"Английский":{"grade":70,"pupils":10},"Математика":{"grade":55,"pupils":26},"Информатика":{"grade":62,"pupils":4},"География":{"grade":68,"pupils":2},"Русский":{"grade":79,"pupils":54}},"pupils":830},{"universities":{"МГУП имени Федорова":0.046511627906976744,"РАНХиГС при Президенте РФ":0.046511627906976744,"МГУ":0.32558139534883723,"НИУ ВШЭ":0.046511627906976744,"МАИ":0.09302325581395349},"name":"Школа №1474","gia":{"Физика":{"grade":3.8,"pupils":36},"Обществознание":{"grade":3.6,"pupils":115},"История":{"grade":3.5,"pupils":8},"Биология":{"grade":3.8,"pupils":24},"Химия":{"grade":4.2,"pupils":24},"Математика":{"grade":3.7,"pupils":288},"Английский":{"grade":4,"pupils":69},"Литература":{"grade":3.9,"pupils":10},"Информатика":{"grade":4,"pupils":34},"География":{"grade":3.2,"pupils":47},"Немецкий":{"grade":5,"pupils":1},"Русский":{"grade":3.9,"pupils":287}},"year":2015,"report":"http://sch1474s.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202014-2015%20v.3.4.pdf","coordinates":{"latitude":55.871334,"longitude":37.49064},"ege":{},"pupils":1448},{"universities":{"Финансовый университет":0.03636363636363636,"РЭУ имени Плеханова":0.07272727272727272,"РАНХиГС при Президенте РФ":0.07272727272727272,"МГУ":0.34545454545454546,"ГУУ":0.03636363636363636},"name":"Гимназия №1576","gia":{"Физика":{"grade":4.4,"pupils":13},"Обществознание":{"grade":3.8,"pupils":40},"История":{"grade":5,"pupils":1},"Биология":{"grade":3.9,"pupils":13},"Химия":{"grade":4.6,"pupils":8},"Математика":{"grade":3.7,"pupils":340},"Английский":{"grade":4.3,"pupils":51},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.3,"pupils":23},"География":{"grade":3.9,"pupils":14},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4,"pupils":341}},"year":2015,"report":"http://gym1576s.mskobr.ru/files/publ_doklad/PUBL_2015_utver.pdf","coordinates":{"latitude":55.822883,"longitude":37.529367},"ege":{"Физика":{"grade":62,"pupils":null},"Обществознание":{"grade":59,"pupils":null},"История":{"grade":53,"pupils":null},"Биология":{"grade":65,"pupils":null},"Химия":{"grade":68,"pupils":null},"Литература":{"grade":63,"pupils":null},"Английский":{"grade":74,"pupils":null},"Математика":{"grade":55,"pupils":null},"Информатика":{"grade":62,"pupils":null},"География":{"grade":63,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":1542},{"universities":{"РНИМУ имени Пирогова":0.027777777777777776,"АГЗ МЧС России":0.08333333333333333,"РАНХиГС при Президенте РФ":0.1111111111111111,"МГУ":0.3888888888888889,"АПИ при ИГиП РАН":0.05555555555555555},"name":"Петровский кадетский корпус","gia":{"Физика":{"grade":3,"pupils":5},"Обществознание":{"grade":3,"pupils":17},"История":{"grade":2.3,"pupils":4},"Биология":{"grade":3.5,"pupils":4},"Английский":{"grade":2.5,"pupils":2},"Математика":{"grade":3.1,"pupils":45},"География":{"grade":3,"pupils":1},"Русский":{"grade":3.4,"pupils":45}},"year":2015,"report":"http://schks1702.mskobr.ru/files/14-15%20%D1%81%D0%B0%D0%BC%D0%BE%D0%BE%D0%B1%D1%81%D0%BB%D0%B5%D0%B4%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5.docx","coordinates":{"latitude":55.864636,"longitude":37.515245},"ege":{},"pupils":500},{"universities":{"Финансовый университет":0.044444444444444446,"МГИМО":0.08888888888888889,"РАНХиГС при Президенте РФ":0.044444444444444446,"МГУ":0.3111111111111111,"МГЛУ":0.15555555555555556},"name":"Лицей №1555","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":4.4,"pupils":16},"История":{"grade":5,"pupils":1},"Биология":{"grade":4,"pupils":2},"Английский":{"grade":4.8,"pupils":87},"Химия":{"grade":5,"pupils":2},"Математика":{"grade":4.2,"pupils":105},"Французский":{"grade":4.5,"pupils":11},"Литература":{"grade":4.6,"pupils":5},"Информатика":{"grade":5,"pupils":2},"Испанский":{"grade":4,"pupils":1},"Немецкий":{"grade":4.4,"pupils":7},"Русский":{"grade":4.8,"pupils":105}},"year":2014,"report":"http://lycc1555.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D1%80%D1%83%D0%BA%D0%BE%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D0%B5%D0%BB%D1%8F%20%D0%B7%D0%B0%202013-14.pdf","coordinates":{"latitude":55.737193,"longitude":37.598079},"ege":{},"pupils":1420},{"universities":{"РЭУ имени Плеханова":0.06896551724137931,"МГЛУ":0.034482758620689655,"МГУ":0.27586206896551724,"НИУ ВШЭ":0.08620689655172414,"МГТУ имени Баумана":0.15517241379310345},"name":"Лицей №1524","gia":{"Физика":{"grade":4,"pupils":24},"Обществознание":{"grade":4.3,"pupils":42},"История":{"grade":3.6,"pupils":5},"Биология":{"grade":4,"pupils":16},"Химия":{"grade":4.9,"pupils":14},"Английский":{"grade":4.4,"pupils":35},"Математика":{"grade":4,"pupils":142},"Информатика":{"grade":4.7,"pupils":26},"География":{"grade":4.1,"pupils":10},"Русский":{"grade":4.2,"pupils":142}},"year":2015,"report":"http://lyc1524uv.mskobr.ru/users_files/lyc1524uv/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.pdf","coordinates":{"latitude":55.690872,"longitude":37.71998},"ege":{},"pupils":1920},{"universities":{},"name":"Московская международная гимназия","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":4,"pupils":5},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":1},"Химия":{"grade":4,"pupils":3},"Математика":{"grade":4.3,"pupils":69},"Английский":{"grade":4.6,"pupils":54},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":5,"pupils":3},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.6,"pupils":69}},"year":2015,"report":"http://gymmg.mskobr.ru/files/publichnyj_doklad_2014-2015.pdf","coordinates":{"latitude":55.762247,"longitude":37.786743},"ege":{},"pupils":1560},{"universities":{"Финансовый университет":0.04878048780487805,"РЭУ имени Плеханова":0.036585365853658534,"МГУ":0.35365853658536583,"РУДН":0.036585365853658534,"ГУУ":0.024390243902439025},"name":"Пушкинский лицей №1500","gia":{"Физика":{"grade":3.7,"pupils":18},"Обществознание":{"grade":3.9,"pupils":68},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.7,"pupils":10},"Химия":{"grade":4.1,"pupils":11},"Математика":{"grade":3.7,"pupils":159},"Английский":{"grade":4,"pupils":26},"Литература":{"grade":3.8,"pupils":6},"Информатика":{"grade":4.4,"pupils":13},"География":{"grade":3.8,"pupils":37},"Русский":{"grade":3.8,"pupils":158}},"year":2015,"report":"http://lycc1500.mskobr.ru/files/-%D0%9A%D0%9E%D0%9C%D0%9F%D0%9B%D0%95%D0%9A%D0%A1%202015%20%D0%B3%D0%BE%D0%B4%281%29.pdf","coordinates":{"latitude":55.764749,"longitude":37.63367},"ege":{},"pupils":2720},{"universities":{"Финансовый университет":0.014018691588785047,"МФТИ":0.02336448598130841,"РАНХиГС при Президенте РФ":0.028037383177570093,"МГУ":0.5280373831775701,"НИУ ВШЭ":0.11682242990654206},"name":"Пятьдесят седьмая школа","gia":{"Физика":{"grade":4.5,"pupils":11},"Обществознание":{"grade":3.8,"pupils":24},"История":{"grade":5,"pupils":1},"Биология":{"grade":4.4,"pupils":25},"Химия":{"grade":4.7,"pupils":29},"Математика":{"grade":4.7,"pupils":151},"Английский":{"grade":4.7,"pupils":59},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.7,"pupils":19},"География":{"grade":4,"pupils":4},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.6,"pupils":152}},"year":2014,"report":"http://coc57.mskobr.ru/images/cms/data/osnovnye_principy_organizacii_deyatel_nosti.pdf","coordinates":{"latitude":55.748615,"longitude":37.604987},"ege":{"Физика":{"grade":73,"pupils":null},"Обществознание":{"grade":68,"pupils":null},"История":{"grade":73,"pupils":null},"Биология":{"grade":78,"pupils":null},"Английский":{"grade":73,"pupils":null},"Химия":{"grade":67,"pupils":null},"Литература":{"grade":71,"pupils":null},"Французский":{"grade":90,"pupils":null},"Математика":{"grade":77,"pupils":null},"Информатика":{"grade":78,"pupils":null},"География":{"grade":76,"pupils":null},"Русский":{"grade":80,"pupils":null}},"pupils":1396},{"universities":{"РАНХиГС при Президенте РФ":0.016717325227963525,"Финансовый университет":0.0364741641337386,"АГЗ МЧС России":0.0243161094224924,"МГУ":0.6033434650455927,"АМИ":0.0182370820668693},"name":"Школа №7","gia":{"Математика":{"grade":2.4,"pupils":27},"Русский":{"grade":2.7,"pupils":35}},"year":2015,"report":"http://sch7uz.mskobr.ru/files/publichnyj_doklad_obrazovatel_nogo_uchrezhdeniya_27.pdf","coordinates":{"latitude":55.807764,"longitude":37.515847},"ege":{},"pupils":1836},{"universities":{"ГУЗ":0.2857142857142857,"УМЛ при МГК КПСС":0.14285714285714285,"МГУ":0.14285714285714285,"ГУУ":0.14285714285714285,"АМИ":0.2857142857142857},"name":"Школа №2054","gia":{"Физика":{"grade":3.9,"pupils":12},"Обществознание":{"grade":3.8,"pupils":52},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":3.8,"pupils":6},"Химия":{"grade":3.9,"pupils":12},"Математика":{"grade":3.7,"pupils":288},"Английский":{"grade":4,"pupils":108},"Литература":{"grade":3.8,"pupils":26},"Информатика":{"grade":4.2,"pupils":24},"Испанский":{"grade":3,"pupils":1},"География":{"grade":4.3,"pupils":4},"Немецкий":{"grade":4.5,"pupils":2},"Русский":{"grade":4,"pupils":290}},"year":2015,"report":"http://sch2054.mskobr.ru/files/docs/%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014.docx","coordinates":{"latitude":55.772284,"longitude":37.626106},"ege":{"Физика":{"grade":54,"pupils":28},"Обществознание":{"grade":54,"pupils":143},"История":{"grade":45,"pupils":35},"Биология":{"grade":59,"pupils":10},"Химия":{"grade":60,"pupils":7},"Литература":{"grade":55,"pupils":115},"Английский":{"grade":67,"pupils":95},"Математика":{"grade":48,"pupils":298},"Информатика":{"grade":50,"pupils":8},"География":{"grade":65,"pupils":5},"Немецкий":{"grade":50,"pupils":1},"Русский":{"grade":72,"pupils":298}},"pupils":980},{"universities":{"Финансовый университет":0.056910569105691054,"ГУУ":0.032520325203252036,"МГУ":0.3170731707317073,"НИУ ВШЭ":0.04878048780487805,"МГТУ имени Баумана":0.04065040650406504},"name":"Школа №654","gia":{"Физика":{"grade":4.5,"pupils":30},"Обществознание":{"grade":4.2,"pupils":16},"История":{"grade":4.3,"pupils":4},"Биология":{"grade":4.3,"pupils":15},"Химия":{"grade":4.7,"pupils":35},"Математика":{"grade":4,"pupils":208},"Английский":{"grade":4.2,"pupils":22},"Литература":{"grade":4.3,"pupils":3},"Информатика":{"grade":4.6,"pupils":39},"География":{"grade":4.5,"pupils":14},"Русский":{"grade":4.3,"pupils":208}},"year":2014,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={710DEE58-B2C1-45EE-AAC0-B8FF86877207}&name=%D0%A1amoobsledovanie.pdf","coordinates":{"latitude":55.700775,"longitude":37.744648},"ege":{"Физика":{"grade":66,"pupils":65},"Обществознание":{"grade":61,"pupils":90},"История":{"grade":59,"pupils":28},"Биология":{"grade":75,"pupils":23},"Химия":{"grade":85,"pupils":30},"Литература":{"grade":58,"pupils":11},"Английский":{"grade":65,"pupils":48},"Математика":{"grade":57,"pupils":183},"Информатика":{"grade":79,"pupils":17},"География":{"grade":77,"pupils":9},"Русский":{"grade":73,"pupils":183}},"pupils":2199},{"universities":{"ГАСК":0.06666666666666667,"МНЭПУ":0.13333333333333333,"Финансовый университет":0.06666666666666667,"МГУ":0.4666666666666667,"РГСУ":0.06666666666666667},"name":"Гимназия №1528","gia":{"Физика":{"grade":3.8,"pupils":6},"Обществознание":{"grade":4,"pupils":47},"История":{"grade":4,"pupils":3},"Биология":{"grade":3.8,"pupils":9},"Английский":{"grade":4.2,"pupils":42},"Химия":{"grade":4.3,"pupils":8},"Математика":{"grade":3.7,"pupils":194},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4.5,"pupils":4},"Информатика":{"grade":4.8,"pupils":6},"География":{"grade":3.3,"pupils":9},"Русский":{"grade":3.9,"pupils":197}},"year":2015,"report":"http://gym1528zg.mskobr.ru/files/1528_samoobsledovanie14_15.pdf","coordinates":{"latitude":55.976302,"longitude":37.190765},"ege":{"Физика":{"grade":57,"pupils":null},"Обществознание":{"grade":61,"pupils":null},"История":{"grade":54,"pupils":null},"Биология":{"grade":56,"pupils":null},"Английский":{"grade":78,"pupils":null},"Химия":{"grade":60,"pupils":null},"Литература":{"grade":62,"pupils":null},"Французский":{"grade":84,"pupils":null},"Математика":{"grade":50,"pupils":null},"Информатика":{"grade":51,"pupils":null},"География":{"grade":58,"pupils":null},"Русский":{"grade":75,"pupils":null}},"pupils":2318},{"universities":{"Collège Universitaire Français de Moscou":0.08333333333333333,"РЭУ имени Плеханова":0.08333333333333333,"Первый МГМУ имени Сеченова":0.08333333333333333,"МГУ":0.3333333333333333,"ИГУ МГИМО МИД РФ":0.08333333333333333},"name":"Школа №2000","gia":{"Физика":{"grade":3.3,"pupils":12},"Обществознание":{"grade":3.7,"pupils":59},"История":{"grade":3,"pupils":1},"Биология":{"grade":3,"pupils":2},"Химия":{"grade":4,"pupils":4},"Математика":{"grade":3.8,"pupils":127},"Английский":{"grade":3.9,"pupils":9},"Литература":{"grade":3.5,"pupils":6},"Информатика":{"grade":4.5,"pupils":2},"География":{"grade":4,"pupils":2},"Русский":{"grade":3.9,"pupils":126}},"year":2015,"report":"http://sch2000u.mskobr.ru/files/samoanaliz-2014-15.pdf","coordinates":{"latitude":55.64222,"longitude":37.659973},"ege":{},"pupils":1680},{"universities":{"Финансовый университет":0.05063291139240506,"МГЮА имени Кутафина":0.02531645569620253,"РАНХиГС при Президенте РФ":0.05063291139240506,"МГУ":0.34177215189873417,"РУДН":0.0759493670886076},"name":"Лицей №1158","gia":{"Физика":{"grade":4,"pupils":14},"Обществознание":{"grade":3.8,"pupils":125},"История":{"grade":3.7,"pupils":7},"Биология":{"grade":3.5,"pupils":23},"Английский":{"grade":4.3,"pupils":81},"Химия":{"grade":4.1,"pupils":11},"Французский":{"grade":4,"pupils":2},"Математика":{"grade":3.8,"pupils":228},"Информатика":{"grade":3.6,"pupils":24},"География":{"grade":3.8,"pupils":12},"Русский":{"grade":4.1,"pupils":227}},"year":2015,"report":"http://sch1158.mskobr.ru/files/PUB_doklad/Pub_doc_2014-2015.pdf","coordinates":{"latitude":55.634786,"longitude":37.596273},"ege":{"Физика":{"grade":50,"pupils":null},"Обществознание":{"grade":60,"pupils":null},"История":{"grade":64,"pupils":null},"Биология":{"grade":67,"pupils":null},"Химия":{"grade":76,"pupils":null},"Английский":{"grade":66,"pupils":null},"Литература":{"grade":73,"pupils":null},"Информатика":{"grade":58,"pupils":null},"География":{"grade":65,"pupils":null},"Русский":{"grade":69,"pupils":null}},"pupils":1436},{"universities":{},"name":"Школа №2045","gia":{"Физика":{"grade":4,"pupils":22},"Обществознание":{"grade":3.7,"pupils":42},"История":{"grade":3,"pupils":3},"Биология":{"grade":4.1,"pupils":10},"Химия":{"grade":4.2,"pupils":14},"Математика":{"grade":3.6,"pupils":136},"Английский":{"grade":4.4,"pupils":7},"Литература":{"grade":4.4,"pupils":5},"Информатика":{"grade":4.2,"pupils":5},"География":{"grade":4,"pupils":1},"Русский":{"grade":3.9,"pupils":137}},"year":2015,"report":"http://sch2045zg.mskobr.ru/files/2031/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.pdf","coordinates":{"latitude":55.973542,"longitude":37.1704},"ege":{},"pupils":1300},{"universities":{"РГГУ":0.05555555555555555,"МФТИ":0.05555555555555555,"МГЮА":0.05555555555555555,"МГУ":0.16666666666666666,"МАИ":0.05555555555555555},"name":"Лицей №1564 имени Белобородова","gia":{"Физика":{"grade":4.2,"pupils":24},"Обществознание":{"grade":4.2,"pupils":34},"История":{"grade":4.3,"pupils":3},"Биология":{"grade":3.7,"pupils":30},"Химия":{"grade":3.6,"pupils":26},"Математика":{"grade":4,"pupils":158},"Английский":{"grade":4.2,"pupils":31},"Литература":{"grade":4.3,"pupils":6},"Информатика":{"grade":4.4,"pupils":60},"География":{"grade":3.6,"pupils":21},"Русский":{"grade":4.1,"pupils":160}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={37FD920F-1627-4814-B580-32389D55F5F7}&name=2014-2015--samoobsledovanie.pdf","coordinates":{"latitude":55.830265,"longitude":37.360564},"ege":{"Физика":{"grade":62,"pupils":5},"Обществознание":{"grade":58,"pupils":20},"История":{"grade":60,"pupils":8},"Биология":{"grade":63,"pupils":12},"Химия":{"grade":56,"pupils":7},"Литература":{"grade":37,"pupils":3},"Английский":{"grade":63,"pupils":10},"Математика":{"grade":44,"pupils":null},"Информатика":{"grade":46,"pupils":5},"География":{"grade":49,"pupils":1},"Русский":{"grade":71,"pupils":null}},"pupils":1810},{"universities":{"Финансовый университет":0.03773584905660377,"МГТУ имени Баумана":0.03773584905660377,"РАНХиГС при Президенте РФ":0.03773584905660377,"МГУ":0.24528301886792453,"МАИ":0.03773584905660377},"name":"Школа №1747","gia":{"Физика":{"grade":3.6,"pupils":8},"Обществознание":{"grade":3.8,"pupils":55},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3.6,"pupils":13},"Химия":{"grade":4,"pupils":4},"Математика":{"grade":3.8,"pupils":132},"Английский":{"grade":3.8,"pupils":11},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":4.2,"pupils":35},"География":{"grade":4.2,"pupils":5},"Русский":{"grade":3.9,"pupils":131}},"year":2015,"report":"http://sch1747sz.mskobr.ru/report/","coordinates":{"latitude":55.846249,"longitude":37.352372},"ege":{},"pupils":1980},{"universities":{"МАТИ Циолковского":0.030303030303030304,"РАНХиГС при Президенте РФ":0.045454545454545456,"АГЗ МЧС России":0.06060606060606061,"МГУ":0.4090909090909091,"МАИ":0.045454545454545456},"name":"Лицей №138","gia":{"Физика":{"grade":3.8,"pupils":11},"Обществознание":{"grade":3.7,"pupils":50},"История":{"grade":3.3,"pupils":3},"Биология":{"grade":3.6,"pupils":12},"Химия":{"grade":4.5,"pupils":2},"Математика":{"grade":3.6,"pupils":169},"Английский":{"grade":4.5,"pupils":26},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":3.9,"pupils":7},"География":{"grade":3,"pupils":1},"Русский":{"grade":4,"pupils":171}},"year":2015,"report":"http://sch138sz.mskobr.ru/files/publichnyj_doklad_2014-15.pdf","coordinates":{"latitude":55.781185,"longitude":37.46458},"ege":{},"pupils":1680},{"universities":{"НИУ ВШЭ":0.036585365853658534,"ГКА имени Маймонида":0.024390243902439025,"МГУ":0.2926829268292683,"ИМЭ имени Горячкина":0.036585365853658534,"МАИ":0.07317073170731707},"name":"Школа №1874","gia":{"Физика":{"grade":3.8,"pupils":32},"Обществознание":{"grade":3.8,"pupils":82},"История":{"grade":3.3,"pupils":3},"Биология":{"grade":3.6,"pupils":10},"Химия":{"grade":3.9,"pupils":7},"Математика":{"grade":3.9,"pupils":124},"Английский":{"grade":4,"pupils":43},"Литература":{"grade":2,"pupils":1},"Информатика":{"grade":4,"pupils":11},"География":{"grade":3.1,"pupils":16},"Русский":{"grade":4,"pupils":123}},"year":2015,"report":"http://sch1874sz.mskobr.ru/files/novyj_publichnyj_doklad_14-15.pdf","coordinates":{"latitude":55.803074,"longitude":37.463143},"ege":{},"pupils":1940},{"universities":{"МГИУ":0.08571428571428572,"МАТИ Циолковского":0.02857142857142857,"ИБХ РАН":0.02857142857142857,"МГУ":0.4,"МАИ":0.05714285714285714},"name":"Школа №1288 имени Троян","gia":{"Физика":{"grade":3.8,"pupils":26},"Обществознание":{"grade":4.1,"pupils":66},"История":{"grade":5,"pupils":1},"Биология":{"grade":3.6,"pupils":36},"Английский":{"grade":4.2,"pupils":29},"Химия":{"grade":4.4,"pupils":19},"Математика":{"grade":3.8,"pupils":149},"Французский":{"grade":3.7,"pupils":9},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.4,"pupils":5},"География":{"grade":4,"pupils":6},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.2,"pupils":148}},"year":2015,"report":"http://sch1288s.mskobr.ru/files/2015%20publdoklad%200630.pdf","coordinates":{"latitude":55.773727,"longitude":37.542141},"ege":{"Физика":{"grade":49,"pupils":null},"Обществознание":{"grade":61,"pupils":null},"История":{"grade":55,"pupils":null},"Биология":{"grade":53,"pupils":null},"Английский":{"grade":86,"pupils":null},"Химия":{"grade":50,"pupils":null},"Литература":{"grade":65,"pupils":null},"Французский":{"grade":87,"pupils":null},"Математика":{"grade":47,"pupils":null},"Информатика":{"grade":60,"pupils":null},"География":{"grade":69,"pupils":null},"Русский":{"grade":77,"pupils":null}},"pupils":1063},{"universities":{"МГСУ НИУ":0.046875,"РЭУ имени Плеханова":0.078125,"Первый МГМУ имени Сеченова":0.03125,"МГУ":0.359375,"МАИ":0.046875},"name":"Школа №2005","gia":{"Физика":{"grade":3.6,"pupils":21},"Обществознание":{"grade":3.9,"pupils":73},"Биология":{"grade":3.6,"pupils":16},"Химия":{"grade":4,"pupils":17},"Математика":{"grade":4,"pupils":148},"Английский":{"grade":4.3,"pupils":31},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":4.1,"pupils":21},"География":{"grade":3.9,"pupils":48},"Русский":{"grade":4.1,"pupils":148}},"year":2015,"report":"http://sch2005sz.mskobr.ru/files/Documents/pubdoc2015.pdf","coordinates":{"latitude":55.894515,"longitude":37.397575},"ege":{},"pupils":2200},{"universities":{"Финансовый университет":0.037037037037037035,"РЭУ имени Плеханова":0.05555555555555555,"МГТУ МИРЭА":0.037037037037037035,"МГУ":0.2037037037037037,"ГУУ":0.037037037037037035},"name":"Школа №627","gia":{"Физика":{"grade":3.5,"pupils":15},"Обществознание":{"grade":3.9,"pupils":67},"Биология":{"grade":4.1,"pupils":17},"Химия":{"grade":4.6,"pupils":23},"Математика":{"grade":3.9,"pupils":217},"Английский":{"grade":4.5,"pupils":74},"Литература":{"grade":4.5,"pupils":4},"Информатика":{"grade":4.7,"pupils":12},"География":{"grade":3.8,"pupils":20},"Русский":{"grade":4.1,"pupils":216}},"year":2015,"report":"http://sch627.mskobr.ru/files/publichnyj_otchet_direktora_2014-2015gg_osnovnoj_variant.pdf","coordinates":{"latitude":55.724489,"longitude":37.635072},"ege":{},"pupils":2388},{"universities":{"Финансовый университет":0.022388059701492536,"МГИМО":0.029850746268656716,"АМИ":0.022388059701492536,"МГУ":0.5074626865671642,"МГЛУ":0.022388059701492536},"name":"Школа №2030","gia":{"Физика":{"grade":3.4,"pupils":7},"Обществознание":{"grade":4.1,"pupils":49},"История":{"grade":4.3,"pupils":6},"Биология":{"grade":3.8,"pupils":15},"Химия":{"grade":4.2,"pupils":13},"Математика":{"grade":4,"pupils":105},"Английский":{"grade":4.7,"pupils":20},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":4.1,"pupils":14},"Русский":{"grade":4.2,"pupils":105}},"year":2015,"report":"http://coc2030.mskobr.ru/files/publichnyi_doklad_po_itogam_20142015.pdf","coordinates":{"latitude":55.75941,"longitude":37.555723},"ege":{},"pupils":1300},{"universities":{"ИТиГ":0.0625,"АЭиУ":0.0625,"МГУУ Правительства Москвы":0.0625,"МГУ":0.375,"МГППУ":0.0625},"name":"Школа №1492","gia":{"Физика":{"grade":3.7,"pupils":15},"Обществознание":{"grade":3.7,"pupils":38},"История":{"grade":3.6,"pupils":5},"Биология":{"grade":3.6,"pupils":16},"Химия":{"grade":4,"pupils":16},"Математика":{"grade":4,"pupils":181},"Английский":{"grade":4.5,"pupils":28},"Литература":{"grade":4.3,"pupils":3},"Информатика":{"grade":4.3,"pupils":17},"География":{"grade":4,"pupils":3},"Русский":{"grade":4.1,"pupils":181}},"year":2015,"report":"http://sch1492uz.mskobr.ru/files/Publichniy_doklad/Publichniy_doklad_2015_.pdf","coordinates":{"latitude":55.540491,"longitude":37.50778},"ege":{},"pupils":1720},{"universities":{"РУДН":0.024390243902439025,"Первый МГМУ имени Сеченова":0.07317073170731707,"РЭУ имени Плеханова":0.024390243902439025,"МГУ":0.4146341463414634,"ГУУ":0.036585365853658534},"name":"Школа №1420","gia":{"Физика":{"grade":4.2,"pupils":5},"Обществознание":{"grade":3.6,"pupils":45},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":14},"Химия":{"grade":4.5,"pupils":15},"Математика":{"grade":3.9,"pupils":156},"Английский":{"grade":4,"pupils":15},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4.5,"pupils":24},"Русский":{"grade":4.1,"pupils":155}},"year":2015,"report":"http://sch1420uv.mskobr.ru/files/ObshieSvedeniy/%D0%9F%D0%A3%D0%91%D0%9B%D0%98%D0%A7%D0%9D%D0%AB%D0%99%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%202015%20%D0%93%D0%91%D0%9E%D0%A3%20%20%D0%A8%D0%9A%D0%9E%D0%9B%D0%90%201420.pdf","coordinates":{"latitude":55.700796,"longitude":37.814878},"ege":{},"pupils":2740},{"universities":{"МГПУ":0.06666666666666667,"Первый МГМУ имени Сеченова":0.044444444444444446,"МГУ":0.4888888888888889,"РУДН":0.044444444444444446,"АПУ":0.022222222222222223},"name":"Школа №1883 ","gia":{"Физика":{"grade":3.6,"pupils":7},"Обществознание":{"grade":3.9,"pupils":39},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.7,"pupils":17},"Химия":{"grade":3.7,"pupils":7},"Математика":{"grade":3.6,"pupils":146},"Английский":{"grade":4,"pupils":23},"Литература":{"grade":3.3,"pupils":4},"Информатика":{"grade":3.9,"pupils":16},"География":{"grade":5,"pupils":1},"Русский":{"grade":4,"pupils":145}},"year":2015,"report":"http://sch1883uz.mskobr.ru/files/Pub_otshet_1.pdf","coordinates":{"latitude":55.54947,"longitude":37.547189},"ege":{},"pupils":2340},{"universities":{"МЭИ":0.03571428571428571,"Финансовый университет":0.047619047619047616,"МГУ":0.20238095238095238,"РУДН":0.03571428571428571,"МГТУ имени Баумана":0.09523809523809523},"name":"Школа №354","gia":{"Физика":{"grade":4.1,"pupils":36},"Обществознание":{"grade":4.2,"pupils":17},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":4.3,"pupils":6},"Химия":{"grade":4.7,"pupils":9},"Математика":{"grade":4.2,"pupils":138},"Английский":{"grade":4.1,"pupils":19},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.8,"pupils":33},"География":{"grade":5,"pupils":1},"Немецкий":{"grade":5,"pupils":1},"Русский":{"grade":4.2,"pupils":138}},"year":2014,"report":"http://sch354c.mskobr.ru/files/1%286%29.pdf","coordinates":{"latitude":55.769276,"longitude":37.677975},"ege":{},"pupils":2300},{"universities":{"Финансовый университет":0.02564102564102564,"МГИМО":0.10256410256410256,"МАБиУ":0.02564102564102564,"МГУ":0.41025641025641024,"МГТУ имени Баумана":0.05128205128205128},"name":"Школа №1259","gia":{"Физика":{"grade":3.6,"pupils":10},"Обществознание":{"grade":4.1,"pupils":43},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.4,"pupils":21},"Химия":{"grade":4.7,"pupils":21},"Математика":{"grade":4,"pupils":89},"Английский":{"grade":4.5,"pupils":39},"Литература":{"grade":5,"pupils":2},"Информатика":{"grade":4,"pupils":5},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":4,"pupils":4},"Русский":{"grade":4.4,"pupils":89}},"year":2015,"report":"http://sch1259.mskobr.ru/files/public.pdf","coordinates":{"latitude":55.732033,"longitude":37.632089},"ege":{},"pupils":1640},{"universities":{"Финансовый университет":0.05263157894736842,"РАНХиГС при Президенте РФ":0.05263157894736842,"МГУ":0.5,"НИУ ВШЭ":0.02631578947368421,"МГИМО":0.02631578947368421},"name":"Гимназия №1409","gia":{"Физика":{"grade":3.8,"pupils":20},"Обществознание":{"grade":3.8,"pupils":63},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.9,"pupils":15},"Химия":{"grade":4.2,"pupils":13},"Математика":{"grade":3.8,"pupils":126},"Английский":{"grade":4.7,"pupils":33},"Литература":{"grade":4,"pupils":6},"Информатика":{"grade":4.5,"pupils":2},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.2,"pupils":126}},"year":2015,"report":"http://gym1409s-new.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202014-2015%20%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9%20%D0%B3%D0%BE%D0%B4%20%28%D0%B8%D1%82%D0%BE%D0%B3%29%202.pdf","coordinates":{"latitude":55.784369,"longitude":37.531702},"ege":{},"pupils":1580},{"universities":{"ИГУ МГИМО МИД РФ":0.14285714285714285,"МГУ":0.7142857142857143,"АПИ при ИГиП РАН":0.14285714285714285},"name":"Школа №2086","gia":{"Физика":{"grade":3.8,"pupils":17},"Обществознание":{"grade":3.9,"pupils":10},"История":{"grade":4,"pupils":4},"Биология":{"grade":4,"pupils":6},"Химия":{"grade":3.7,"pupils":6},"Математика":{"grade":4,"pupils":143},"Английский":{"grade":4.6,"pupils":39},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.8,"pupils":9},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.2,"pupils":142}},"year":2015,"report":"http://sch2086uz.mskobr.ru/report/","coordinates":{"latitude":55.695824,"longitude":37.551367},"ege":{"Физика":{"grade":59,"pupils":44},"Обществознание":{"grade":63,"pupils":107},"История":{"grade":53,"pupils":32},"Биология":{"grade":64,"pupils":34},"Английский":{"grade":74,"pupils":91},"Химия":{"grade":63,"pupils":23},"Литература":{"grade":58,"pupils":12},"Французский":{"grade":77,"pupils":1},"Математика":{"grade":62,"pupils":220},"Информатика":{"grade":66,"pupils":32},"География":{"grade":63,"pupils":7},"Немецкий":{"grade":45,"pupils":2},"Русский":{"grade":77,"pupils":220}},"pupils":2270},{"universities":{"НИТУ МИСиС":0.03076923076923077,"РАНХиГС при Президенте РФ":0.06153846153846154,"МГУ":0.4153846153846154,"НИУ ВШЭ":0.03076923076923077,"АПИ при ИГиП РАН":0.03076923076923077},"name":"Школа №170 имени Чехова","gia":{"Физика":{"grade":3.8,"pupils":4},"Обществознание":{"grade":3.5,"pupils":21},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.7,"pupils":6},"Химия":{"grade":4.8,"pupils":4},"Математика":{"grade":3.2,"pupils":184},"Английский":{"grade":4.1,"pupils":21},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.1,"pupils":36},"География":{"grade":3.4,"pupils":16},"Русский":{"grade":3.6,"pupils":183}},"year":2015,"report":"http://sch170uz.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%2014-15%20%D0%B3%D0%BE%D0%B4%20%D1%88%D0%BA%D0%BE%D0%BB%D0%B0%20%E2%84%96%20170.pdf","coordinates":{"latitude":55.649845,"longitude":37.525001},"ege":{},"pupils":3740},{"universities":{"МЭИ":0.03389830508474576,"МФТИ":0.0847457627118644,"МГУ":0.3559322033898305,"РУДН":0.03389830508474576,"МГТУ имени Баумана":0.15254237288135594},"name":"Лицей №1568","gia":{"Физика":{"grade":4.4,"pupils":80},"Обществознание":{"grade":3.7,"pupils":44},"История":{"grade":3.3,"pupils":3},"Биология":{"grade":3.5,"pupils":11},"Химия":{"grade":4.6,"pupils":25},"Английский":{"grade":4.6,"pupils":22},"Математика":{"grade":4,"pupils":215},"Информатика":{"grade":4.8,"pupils":31},"Испанский":{"grade":4.3,"pupils":24},"География":{"grade":4.3,"pupils":3},"Русский":{"grade":4.1,"pupils":215}},"year":2014,"report":"http://lyc1568.mskobr.ru/report/","coordinates":{"latitude":55.874511,"longitude":37.642887},"ege":{"Математика":{"grade":73,"pupils":null},"Русский":{"grade":79,"pupils":null}},"pupils":2229},{"universities":{},"name":"Школа №1449","gia":{"Физика":{"grade":3.8,"pupils":10},"Обществознание":{"grade":4,"pupils":26},"Биология":{"grade":3.8,"pupils":4},"Химия":{"grade":4.2,"pupils":9},"Английский":{"grade":4.2,"pupils":30},"Математика":{"grade":3.6,"pupils":109},"Информатика":{"grade":4.5,"pupils":11},"География":{"grade":4.7,"pupils":3},"Русский":{"grade":3.9,"pupils":109}},"year":2015,"report":"http://sch1449sv.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.pdf","coordinates":{"latitude":55.894636,"longitude":37.570159},"ege":{},"pupils":1000},{"universities":{"РЭУ имени Плеханова":0.08571428571428572,"МГТУ имени Баумана":0.05714285714285714,"МГЛУ":0.05714285714285714,"МГУ":0.2857142857142857,"МАИ":0.11428571428571428},"name":"Гимназия №1590","gia":{"Физика":{"grade":3.6,"pupils":8},"Обществознание":{"grade":3.8,"pupils":22},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.8,"pupils":6},"Химия":{"grade":4.5,"pupils":6},"Математика":{"grade":3.8,"pupils":94},"Английский":{"grade":4.4,"pupils":17},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":3.9,"pupils":20},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":4.3,"pupils":94}},"year":2015,"report":"http://gym1590s.mskobr.ru/files/%D0%B4%D0%BB%D1%8F_%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F/2015_2016/%D0%9F%D0%A3%D0%91%D0%9B%D0%98%D0%A7%D0%9D%D0%AB%D0%99%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%202015.pdf","coordinates":{"latitude":55.862196,"longitude":37.503064},"ege":{},"pupils":1240},{"universities":{"МГУПИ":0.047619047619047616,"МГПУ":0.047619047619047616,"Финансовый университет":0.047619047619047616,"МГУ":0.4523809523809524,"АГПС МЧС России":0.03571428571428571},"name":"Марьино","gia":{"Физика":{"grade":3.8,"pupils":9},"Обществознание":{"grade":3.6,"pupils":50},"История":{"grade":2.3,"pupils":3},"Биология":{"grade":3.6,"pupils":19},"Химия":{"grade":4.2,"pupils":5},"Математика":{"grade":3.3,"pupils":126},"Английский":{"grade":4.3,"pupils":9},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.3,"pupils":4},"Русский":{"grade":3.9,"pupils":125}},"year":2015,"report":"http://gym491uv.mskobr.ru/files/attach_files/publ.pdf","coordinates":{"latitude":55.649048,"longitude":37.722487},"ege":{},"pupils":1860},{"universities":{"РГУФКСМиТ":0.037037037037037035,"Финансовый университет":0.037037037037037035,"МГУ":0.4074074074074074,"ГУУ":0.037037037037037035,"АГПС МЧС России":0.037037037037037035},"name":"Школа №2010","gia":{"Физика":{"grade":3.9,"pupils":12},"Обществознание":{"grade":3.7,"pupils":58},"Биология":{"grade":3.5,"pupils":15},"Химия":{"grade":4.4,"pupils":11},"Математика":{"grade":3.8,"pupils":146},"Английский":{"grade":4.2,"pupils":37},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.6,"pupils":42},"География":{"grade":3.3,"pupils":14},"Русский":{"grade":4.1,"pupils":147}},"year":2015,"report":"http://sch2010uv.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015_.pdf","coordinates":{"latitude":55.672529,"longitude":37.764276},"ege":{},"pupils":1660},{"universities":{"МЭИ":0.023391812865497075,"Финансовый университет":0.03508771929824561,"РАНХиГС при Президенте РФ":0.04093567251461988,"МГУ":0.5497076023391813,"ГУУ":0.023391812865497075},"name":"Школа №2089","gia":{"Физика":{"grade":3.5,"pupils":4},"Обществознание":{"grade":3.3,"pupils":64},"История":{"grade":3,"pupils":3},"Биология":{"grade":3.5,"pupils":15},"Химия":{"grade":4,"pupils":10},"Литература":{"grade":4,"pupils":3},"Английский":{"grade":4.6,"pupils":7},"Математика":{"grade":3.4,"pupils":149},"Информатика":{"grade":4.2,"pupils":20},"География":{"grade":3.5,"pupils":63},"Русский":{"grade":3.7,"pupils":148}},"year":2015,"report":"http://sch1173.mskobr.ru/files/00-03/2014-2015dir_public_doclad..pdf","coordinates":{"latitude":55.684346,"longitude":37.920808},"ege":{},"pupils":1260},{"universities":{"МГИМО":0.5,"МГУ":0.5},"name":"Многопрофильный образовательный комплекс ","gia":{"Физика":{"grade":3.6,"pupils":33},"Обществознание":{"grade":3.6,"pupils":35},"Биология":{"grade":4,"pupils":2},"Химия":{"grade":4,"pupils":4},"Математика":{"grade":3.6,"pupils":87},"Английский":{"grade":4.4,"pupils":8},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4,"pupils":13},"Русский":{"grade":3.8,"pupils":88}},"year":2015,"report":"http://sch2087uv.mskobr.ru/files/publichnyj_doklad_2014-15.pdf","coordinates":{"latitude":55.651516,"longitude":37.735566},"ege":{},"pupils":1560},{"universities":{},"name":"Школа №2105","gia":{"Физика":{"grade":4.3,"pupils":7},"Обществознание":{"grade":4.3,"pupils":11},"История":{"grade":4,"pupils":3},"Биология":{"grade":4,"pupils":6},"Английский":{"grade":4.6,"pupils":58},"Химия":{"grade":4.8,"pupils":4},"Математика":{"grade":3.9,"pupils":132},"Французский":{"grade":4.3,"pupils":9},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.5,"pupils":8},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":4.2,"pupils":132}},"year":2014,"report":"http://sch2105c.mskobr.ru/report/","coordinates":{"latitude":55.768851,"longitude":37.688},"ege":{},"pupils":1840},{"universities":{"НИУ ВШЭ":0.037037037037037035,"МИЭП":0.024691358024691357,"АГЗ МЧС России":0.037037037037037035,"МГУ":0.32098765432098764,"ГУУ":0.037037037037037035},"name":"Жулебино","gia":{"Физика":{"grade":3.9,"pupils":9},"Обществознание":{"grade":4.2,"pupils":32},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":4,"pupils":1},"Химия":{"grade":4.5,"pupils":11},"Математика":{"grade":4.2,"pupils":109},"Английский":{"grade":4.5,"pupils":32},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.8,"pupils":10},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.3,"pupils":110}},"year":2015,"report":"http://lyc1793uv.mskobr.ru/files/Dokumenti/%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%202014-2015.pdf","coordinates":{"latitude":55.683894,"longitude":37.847829},"ege":{},"pupils":1620},{"universities":{"МИЭП":0.125,"МГУ":0.625,"НИУ ВШЭ":0.125,"АМИ":0.125},"name":"Школа №2095 ","gia":{"Физика":{"grade":3.5,"pupils":26},"Обществознание":{"grade":3.8,"pupils":64},"История":{"grade":3,"pupils":4},"Биология":{"grade":3.6,"pupils":18},"Английский":{"grade":4.2,"pupils":32},"Химия":{"grade":3.6,"pupils":12},"Математика":{"grade":3.7,"pupils":185},"Французский":{"grade":3.6,"pupils":5},"Литература":{"grade":3.8,"pupils":9},"Информатика":{"grade":4.3,"pupils":9},"География":{"grade":3.5,"pupils":2},"Немецкий":{"grade":2,"pupils":1},"Русский":{"grade":3.9,"pupils":184}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={ABFEC6C9-AE56-4D07-93A1-3DA21C97F478}&name=samoobledovanie_iiikvart_2015.pdf","coordinates":{"latitude":55.760373,"longitude":37.655634},"ege":{},"pupils":3261},{"universities":{"Финансовый университет":0.11210762331838565,"АГЗ МЧС России":0.017937219730941704,"МГУ":0.5201793721973094,"АГПС МЧС России":0.026905829596412557,"АПИ при ИГиП РАН":0.04484304932735426},"name":"Лицей №429","gia":{"Физика":{"grade":3.5,"pupils":14},"Обществознание":{"grade":3.7,"pupils":26},"Биология":{"grade":4.2,"pupils":13},"Химия":{"grade":4.3,"pupils":11},"Литература":{"grade":5,"pupils":1},"Английский":{"grade":3.8,"pupils":18},"Математика":{"grade":3.7,"pupils":159},"Информатика":{"grade":4.3,"pupils":31},"География":{"grade":3.7,"pupils":6},"Русский":{"grade":3.8,"pupils":159}},"year":2015,"report":"http://cog429.mskobr.ru/files/publichnyj_doklad_licej_429_2015_sajt.pdf","coordinates":{"latitude":55.77551,"longitude":37.725047},"ege":{"Физика":{"grade":60,"pupils":null},"Обществознание":{"grade":54,"pupils":null},"История":{"grade":48,"pupils":null},"Биология":{"grade":58,"pupils":null},"Химия":{"grade":68,"pupils":null},"Литература":{"grade":56,"pupils":null},"Английский":{"grade":67,"pupils":null},"Математика":{"grade":50,"pupils":null},"Информатика":{"grade":48,"pupils":null},"География":{"grade":60,"pupils":null},"Русский":{"grade":71,"pupils":null}},"pupils":3957},{"universities":{"МГУПИ":0.047619047619047616,"Финансовый университет":0.047619047619047616,"МГУ":0.40476190476190477,"МГЮА имени Кутафина":0.023809523809523808,"РГСУ":0.023809523809523808},"name":"Школа №953","gia":{"Физика":{"grade":3.9,"pupils":7},"Обществознание":{"grade":3.5,"pupils":26},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3.6,"pupils":8},"Химия":{"grade":4.1,"pupils":16},"Математика":{"grade":3.5,"pupils":106},"Английский":{"grade":3.4,"pupils":9},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.3,"pupils":24},"География":{"grade":4,"pupils":3},"Русский":{"grade":3.9,"pupils":106}},"year":2013,"report":"http://co953sv.mskobr.ru/report/","coordinates":{"latitude":55.896014,"longitude":37.589446},"ege":{},"pupils":2740},{"universities":{"РГУНГ имени Губкина":0.046153846153846156,"Финансовый университет":0.06153846153846154,"РЭУ имени Плеханова":0.046153846153846156,"МГУ":0.35384615384615387,"РУДН":0.046153846153846156},"name":"Школа №1240","gia":{"Обществознание":{"grade":3.8,"pupils":4},"История":{"grade":3,"pupils":1},"Биология":{"grade":3,"pupils":2},"Английский":{"grade":4.7,"pupils":35},"Математика":{"grade":4,"pupils":105},"Информатика":{"grade":5,"pupils":3},"Русский":{"grade":4.2,"pupils":105}},"year":2015,"report":"http://sch1240.mskobr.ru/files/attach_files/publichnyj_doklad_2015.pdf","coordinates":{"latitude":55.772573,"longitude":37.58226},"ege":{},"pupils":2320},{"universities":{},"name":"Школа №345 имени Пушкина","gia":{"Физика":{"grade":3.6,"pupils":11},"Обществознание":{"grade":3.5,"pupils":33},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":4.7,"pupils":3},"Химия":{"grade":4.7,"pupils":7},"Математика":{"grade":3.8,"pupils":67},"Английский":{"grade":4.3,"pupils":4},"Литература":{"grade":3.3,"pupils":4},"Информатика":{"grade":3.9,"pupils":9},"Русский":{"grade":3.8,"pupils":68}},"year":2015,"report":"http://sch345.mskobr.ru/files/%20%D0%BE%D1%82%D0%BA%D1%80%D1%8B%D1%82%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.%20%D0%98%D0%A2%D0%9E%D0%93%20docx.docx","coordinates":{"latitude":55.772998,"longitude":37.672666},"ege":{},"pupils":1360},{"universities":{"Финансовый университет":0.09210526315789473,"МАИ":0.039473684210526314,"МАХУ памяти 1905 года":0.02631578947368421,"МГУ":0.35526315789473684,"АМИ":0.05263157894736842},"name":"Школа №141","gia":{"Физика":{"grade":3.5,"pupils":18},"Обществознание":{"grade":3.9,"pupils":24},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.1,"pupils":17},"Химия":{"grade":4.5,"pupils":17},"Математика":{"grade":3.9,"pupils":89},"Английский":{"grade":4,"pupils":10},"Литература":{"grade":3.5,"pupils":4},"Информатика":{"grade":4.5,"pupils":8},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":89}},"year":2015,"report":"http://sch141s.mskobr.ru/files/public_order_2015.pdf","coordinates":{"latitude":55.778846,"longitude":37.514158},"ege":{},"pupils":1500},{"universities":{"РГГУ":0.03773584905660377,"РЭУ имени Плеханова":0.03773584905660377,"МГУ":0.18867924528301888,"НИУ ВШЭ":0.05660377358490566,"МАИ":0.03773584905660377},"name":"Школа №1454 ","gia":{"Физика":{"grade":4.3,"pupils":3},"Обществознание":{"grade":3.9,"pupils":17},"История":{"grade":3.7,"pupils":6},"Биология":{"grade":3.8,"pupils":8},"Химия":{"grade":4.3,"pupils":6},"Математика":{"grade":3.3,"pupils":116},"Английский":{"grade":4.1,"pupils":16},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":3.7,"pupils":7},"География":{"grade":3,"pupils":2},"Русский":{"grade":3.8,"pupils":115}},"year":2015,"report":"http://sch1454s.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20-%202014-2015.pdf","coordinates":{"latitude":55.813334,"longitude":37.568929},"ege":{"Физика":{"grade":54,"pupils":null},"Обществознание":{"grade":60,"pupils":null},"История":{"grade":63,"pupils":null},"Биология":{"grade":57,"pupils":null},"Химия":{"grade":59,"pupils":null},"Литература":{"grade":61,"pupils":null},"Английский":{"grade":81,"pupils":null},"Математика":{"grade":45,"pupils":null},"Информатика":{"grade":47,"pupils":null},"География":{"grade":62,"pupils":null},"Русский":{"grade":73,"pupils":null}},"pupils":1127},{"universities":{"МГИМО":0.075,"РАНХиГС при Президенте РФ":0.075,"МГУ":0.275,"ВАВТ":0.05,"ГУУ":0.05},"name":"Школа №1208 имени Шумилова","gia":{"Физика":{"grade":4.2,"pupils":6},"Обществознание":{"grade":3.7,"pupils":29},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":9},"Английский":{"grade":4.6,"pupils":49},"Химия":{"grade":4.3,"pupils":3},"Математика":{"grade":4,"pupils":95},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4.5,"pupils":4},"Информатика":{"grade":4.5,"pupils":4},"Русский":{"grade":4.3,"pupils":96}},"year":2015,"report":"http://sch1208uv.mskobr.ru/files/publichnyj_otchet_2015-2016_s_pechat_yu.pdf","coordinates":{"latitude":55.707765,"longitude":37.771211},"ege":{},"pupils":1540},{"universities":{"МГПУ":0.05263157894736842,"РАНХиГС при Президенте РФ":0.07017543859649122,"МГУ":0.22807017543859648,"НИУ ВШЭ":0.05263157894736842,"МГТУ имени Баумана":0.05263157894736842},"name":"Школа №2006","gia":{"Физика":{"grade":4.1,"pupils":9},"Обществознание":{"grade":4.2,"pupils":40},"Биология":{"grade":4,"pupils":12},"Химия":{"grade":4.5,"pupils":13},"Английский":{"grade":4.4,"pupils":37},"Математика":{"grade":4.1,"pupils":107},"Информатика":{"grade":4.3,"pupils":11},"Русский":{"grade":4.3,"pupils":107}},"year":2015,"report":"http://sch2006uz.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%20%D1%81%20%D1%81%D0%BE%D0%B4.pdf","coordinates":{"latitude":55.565784,"longitude":37.582367},"ege":{},"pupils":1700},{"universities":{"НИУ ВШЭ":0.027777777777777776,"АПУ при ИГиП РАН":0.05555555555555555,"Финансовый университет":0.027777777777777776,"МГУ":0.4444444444444444,"МФЮА":0.05555555555555555},"name":"Школа №554","gia":{"Физика":{"grade":3.5,"pupils":10},"Обществознание":{"grade":3.8,"pupils":40},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.8,"pupils":11},"Химия":{"grade":4.1,"pupils":7},"Математика":{"grade":3.7,"pupils":108},"Английский":{"grade":3.9,"pupils":11},"Литература":{"grade":4.3,"pupils":3},"Информатика":{"grade":4,"pupils":8},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":4.1,"pupils":108}},"year":2014,"report":"http://sch554uz.mskobr.ru/report/","coordinates":{"latitude":55.65596,"longitude":37.578909},"ege":{},"pupils":2060},{"universities":{"Финансовый университет":0.023809523809523808,"Первый МГМУ имени Сеченова":0.015873015873015872,"РАНХиГС при Президенте РФ":0.023809523809523808,"МГУ":0.5476190476190477,"АГПС":0.015873015873015872},"name":"Школа №46","gia":{"Физика":{"grade":3.6,"pupils":5},"Обществознание":{"grade":4.2,"pupils":14},"Биология":{"grade":4.1,"pupils":7},"Химия":{"grade":4.6,"pupils":8},"Математика":{"grade":3.9,"pupils":49},"Английский":{"grade":4,"pupils":17},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.3,"pupils":6},"География":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":48}},"year":2015,"report":"http://school46msk.ru/file/44416/publichnyydoklad2014-15.doc","coordinates":{"latitude":55.657362,"longitude":37.511984},"ege":{},"pupils":1000},{"universities":{"МГИУ":0.07692307692307693,"АФСБ РФ":0.038461538461538464,"ГУЗ":0.038461538461538464,"МГУ":0.34615384615384615,"ИПИ":0.019230769230769232},"name":"Школа №902 ","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":3.8,"pupils":59},"История":{"grade":2.8,"pupils":6},"Биология":{"grade":3.6,"pupils":14},"Химия":{"grade":4.1,"pupils":12},"Математика":{"grade":3.6,"pupils":194},"Английский":{"grade":3.9,"pupils":33},"Литература":{"grade":4,"pupils":21},"Информатика":{"grade":4.2,"pupils":15},"Русский":{"grade":4.1,"pupils":194}},"year":2015,"report":"http://sch902.mskobr.ru/report/","coordinates":{"latitude":55.59107,"longitude":37.66795},"ege":{},"pupils":1836},{"universities":{"МЭСИ":0.041666666666666664,"МАИ":0.08333333333333333,"МГУ":0.4583333333333333,"ВАВТ":0.041666666666666664,"МГТУ имени Баумана":0.08333333333333333},"name":"Школа №1329","gia":{"Физика":{"grade":4.3,"pupils":41},"Обществознание":{"grade":4.2,"pupils":45},"История":{"grade":3.7,"pupils":15},"Биология":{"grade":4.5,"pupils":18},"Химия":{"grade":3.9,"pupils":18},"Математика":{"grade":4.2,"pupils":114},"Английский":{"grade":4.1,"pupils":24},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.6,"pupils":32},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.1,"pupils":113}},"year":2015,"report":"http://www.youblisher.com/p/1167967-%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9-%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4-%D0%B7%D0%B0-2014-2015-%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9-%D0%B3%D0%BE%D0%B4/","coordinates":{"latitude":55.668935,"longitude":37.465002},"ege":{"Физика":{"grade":70,"pupils":6},"Обществознание":{"grade":70,"pupils":36},"История":{"grade":69,"pupils":9},"Биология":{"grade":70,"pupils":7},"Английский":{"grade":82,"pupils":30},"Химия":{"grade":68,"pupils":7},"Литература":{"grade":72,"pupils":5},"Французский":{"grade":94,"pupils":1},"Математика":{"grade":60,"pupils":72},"Информатика":{"grade":73,"pupils":9},"Немецкий":{"grade":58,"pupils":1},"Русский":{"grade":73,"pupils":72}},"pupils":463},{"universities":{"МПГУ":0.08571428571428572,"Финансовый университет":0.08571428571428572,"МГУ":0.2571428571428571,"МГЮА имени Кутафина":0.02857142857142857,"МГТУ Станкин":0.02857142857142857},"name":"Школа №293 имени Твардовского","gia":{"Физика":{"grade":4,"pupils":26},"Обществознание":{"grade":4,"pupils":49},"История":{"grade":3.5,"pupils":10},"Биология":{"grade":4.2,"pupils":14},"Химия":{"grade":3.8,"pupils":9},"Английский":{"grade":4,"pupils":22},"Математика":{"grade":3.9,"pupils":132},"Информатика":{"grade":4.3,"pupils":27},"География":{"grade":4.5,"pupils":2},"Немецкий":{"grade":2,"pupils":1},"Русский":{"grade":4.2,"pupils":133}},"year":2014,"report":"http://sch293.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.doc","coordinates":{"latitude":55.827393,"longitude":37.653146},"ege":{},"pupils":1420},{"universities":{"МГГУ имени Шолохова":0.03225806451612903,"Финансовый университет":0.03225806451612903,"РГСУ":0.03225806451612903,"МГУ":0.3387096774193548,"МГУДТ":0.03225806451612903},"name":"Гимназия №1637","gia":{"Физика":{"grade":3.3,"pupils":3},"Обществознание":{"grade":4,"pupils":25},"Биология":{"grade":4,"pupils":8},"Химия":{"grade":4.3,"pupils":3},"Английский":{"grade":4,"pupils":3},"Математика":{"grade":3.6,"pupils":64},"Информатика":{"grade":3.4,"pupils":7},"География":{"grade":4.3,"pupils":3},"Русский":{"grade":4.1,"pupils":64}},"year":2015,"report":"http://gym1637.mskobr.ru/files/publichnyy_doklad/publichnyy-doklad-14-15.pdf","coordinates":{"latitude":55.759527,"longitude":37.783635},"ege":{},"pupils":1480},{"universities":{"АГЗ МЧС России":0.023255813953488372,"Финансовый университет":0.02616279069767442,"РАНХиГС при Президенте РФ":0.040697674418604654,"МГУ":0.5203488372093024,"АПИ при ИГиП РАН":0.029069767441860465},"name":"Школа №109","gia":{"Физика":{"grade":3.9,"pupils":9},"Обществознание":{"grade":4,"pupils":46},"Биология":{"grade":4,"pupils":9},"Химия":{"grade":3.9,"pupils":16},"Математика":{"grade":3.9,"pupils":106},"Английский":{"grade":4.8,"pupils":19},"Литература":{"grade":3.8,"pupils":4},"Информатика":{"grade":3.7,"pupils":3},"География":{"grade":4.4,"pupils":10},"Немецкий":{"grade":3.9,"pupils":9},"Русский":{"grade":4.3,"pupils":106}},"year":2013,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={10EF1ED4-D874-4B02-B428-F355CE02EBD4}&name=samoobsledovanie.pdf","coordinates":{"latitude":55.640467,"longitude":37.475701},"ege":{"Физика":{"grade":66,"pupils":7},"Обществознание":{"grade":69,"pupils":45},"История":{"grade":63,"pupils":19},"Биология":{"grade":71,"pupils":10},"Английский":{"grade":73,"pupils":30},"Химия":{"grade":72,"pupils":9},"Литература":{"grade":58,"pupils":11},"Французский":{"grade":95,"pupils":1},"Математика":{"grade":55,"pupils":null},"Информатика":{"grade":81,"pupils":3},"География":{"grade":78,"pupils":3},"Немецкий":{"grade":68,"pupils":6},"Русский":{"grade":77,"pupils":null}},"pupils":1774},{"universities":{"Финансовый университет":0.04285714285714286,"РАНХиГС при Президенте РФ":0.04285714285714286,"МГУ":0.4357142857142857,"РЭУ имени Плеханова":0.02857142857142857,"АМИ":0.02142857142857143},"name":"Школа №2109","gia":{"Физика":{"grade":3.7,"pupils":21},"Обществознание":{"grade":4.1,"pupils":41},"История":{"grade":4,"pupils":4},"Биология":{"grade":3.9,"pupils":22},"Химия":{"grade":4.1,"pupils":23},"Математика":{"grade":3.7,"pupils":250},"Английский":{"grade":4.3,"pupils":26},"Литература":{"grade":3.9,"pupils":7},"Информатика":{"grade":4.5,"pupils":29},"География":{"grade":3.8,"pupils":8},"Русский":{"grade":4.1,"pupils":244}},"year":2015,"report":"http://sch2109.mskobr.ru/files/docs/public_report_14-15.pdf","coordinates":{"latitude":55.502406,"longitude":37.596381},"ege":{"Физика":{"grade":59,"pupils":30},"Обществознание":{"grade":58,"pupils":71},"История":{"grade":45,"pupils":22},"Биология":{"grade":52,"pupils":18},"Английский":{"grade":76,"pupils":18},"Химия":{"grade":52,"pupils":12},"Литература":{"grade":61,"pupils":16},"Французский":{"grade":46,"pupils":2},"Математика":{"grade":48,"pupils":93},"Информатика":{"grade":65,"pupils":27},"География":{"grade":62,"pupils":6},"Русский":{"grade":71,"pupils":141}},"pupils":5309},{"universities":{"МИИГАиК":0.024691358024691357,"Первый МГМУ имени Сеченова":0.037037037037037035,"МГУ":0.41975308641975306,"ГУМФ":0.024691358024691357,"МАИ":0.037037037037037035},"name":"Школа №544","gia":{"Физика":{"grade":3.6,"pupils":19},"Обществознание":{"grade":3.8,"pupils":42},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.5,"pupils":13},"Химия":{"grade":3.8,"pupils":4},"Английский":{"grade":4.2,"pupils":5},"Математика":{"grade":3.7,"pupils":118},"Информатика":{"grade":4.4,"pupils":12},"География":{"grade":4,"pupils":15},"Русский":{"grade":4,"pupils":118}},"year":2014,"report":"http://sch544u.mskobr.ru/files/%20%D0%B3%D0%BE%D0%B4%D0%B0.pps","coordinates":{"latitude":55.606761,"longitude":37.714806},"ege":{},"pupils":1420},{"universities":{"МГИУ":0.05,"МГУПИ":0.05,"Финансовый университет":0.05,"МГУ":0.35,"РГАУ-МСХА имени Тимирязева":0.05},"name":"Школа №878","gia":{"Физика":{"grade":3.3,"pupils":13},"Обществознание":{"grade":3.5,"pupils":62},"История":{"grade":3,"pupils":3},"Биология":{"grade":3.9,"pupils":12},"Химия":{"grade":4.1,"pupils":10},"Английский":{"grade":4.1,"pupils":18},"Математика":{"grade":3.6,"pupils":190},"Информатика":{"grade":4.7,"pupils":20},"География":{"grade":4.1,"pupils":14},"Русский":{"grade":3.9,"pupils":197}},"year":2015,"report":"http://sch878u.mskobr.ru/files/%2014-15.pdf","coordinates":{"latitude":55.613758,"longitude":37.697855},"ege":{},"pupils":2060},{"universities":{"Юринфор":0.03571428571428571,"Финансовый университет":0.03571428571428571,"Первый МГМУ имени Сеченова":0.03571428571428571,"МГУ":0.42857142857142855,"ГУМФ":0.03571428571428571},"name":"Школа №1212","gia":{"Физика":{"grade":4.1,"pupils":14},"Обществознание":{"grade":4,"pupils":24},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4.1,"pupils":8},"Химия":{"grade":4.5,"pupils":11},"Математика":{"grade":3.6,"pupils":125},"Английский":{"grade":3.9,"pupils":22},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":3.7,"pupils":13},"География":{"grade":3.7,"pupils":6},"Русский":{"grade":4,"pupils":124}},"year":2015,"report":"http://sch1212.mskobr.ru/files/rezul_taty_uchebnoj_raboty_v_2014-2015_uchebnom_godu.pdf","coordinates":{"latitude":55.597943,"longitude":37.517266},"ege":{},"pupils":1980},{"universities":{},"name":"Школа №2114","gia":{"Физика":{"grade":3.6,"pupils":16},"Обществознание":{"grade":3.8,"pupils":52},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.8,"pupils":17},"Химия":{"grade":3.9,"pupils":13},"Математика":{"grade":3.7,"pupils":226},"Английский":{"grade":4.1,"pupils":35},"Литература":{"grade":3.3,"pupils":4},"Информатика":{"grade":4.3,"pupils":28},"География":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":224}},"year":2015,"report":"http://sch2114uz.mskobr.ru/files/%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94_N.pdf","coordinates":{"latitude":55.569387,"longitude":37.57254},"ege":{"Физика":{"grade":58,"pupils":null},"Обществознание":{"grade":61,"pupils":null},"История":{"grade":47,"pupils":null},"Биология":{"grade":70,"pupils":null},"Химия":{"grade":63,"pupils":null},"Литература":{"grade":63,"pupils":null},"Английский":{"grade":69,"pupils":null},"Математика":{"grade":58,"pupils":null},"Информатика":{"grade":54,"pupils":null},"Русский":{"grade":75,"pupils":null}},"pupils":4611},{"universities":{"МТС":0.03571428571428571,"МИИТ":0.07142857142857142,"МГУ":0.5357142857142857,"МГМСУ имени Евдокимова":0.03571428571428571,"МГУДТ":0.03571428571428571},"name":"Школа №1103 имени Соломатина","gia":{"Физика":{"grade":3.8,"pupils":4},"Обществознание":{"grade":3.6,"pupils":17},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.6,"pupils":5},"Химия":{"grade":4.4,"pupils":5},"Английский":{"grade":4,"pupils":14},"Математика":{"grade":3.3,"pupils":163},"Информатика":{"grade":4,"pupils":19},"География":{"grade":3.6,"pupils":8},"Русский":{"grade":3.6,"pupils":163}},"year":2014,"report":"http://sch1103uz.mskobr.ru/files/publichniy_otchet_794_13-14-2.pdf","coordinates":{"latitude":55.606065,"longitude":37.552436},"ege":{},"pupils":2460},{"universities":{"МГИУ":0.02857142857142857,"МГУПБ":0.02857142857142857,"МГУ":0.6,"АУ МВД РФ":0.05714285714285714,"АГПС МЧС России":0.05714285714285714},"name":"Школа №2110 ","gia":{"Физика":{"grade":4,"pupils":6},"Обществознание":{"grade":3.6,"pupils":30},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.5,"pupils":11},"Химия":{"grade":4.6,"pupils":14},"Математика":{"grade":3.3,"pupils":148},"Английский":{"grade":4.3,"pupils":3},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":3.9,"pupils":13},"География":{"grade":4.4,"pupils":9},"Русский":{"grade":3.5,"pupils":148}},"year":2014,"report":"http://sch2110.mskobr.ru/files/%D0%94%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D1%8B/po_2110.pdf","coordinates":{"latitude":55.643302,"longitude":37.718804},"ege":{},"pupils":1460},{"universities":{"МГУДТ":0.030303030303030304,"Финансовый университет":0.030303030303030304,"АПИ при ИГиП РАН":0.06060606060606061,"МГУ":0.36363636363636365,"МГТУ имени Баумана":0.06060606060606061},"name":"Школа №1566 ","gia":{"Физика":{"grade":4,"pupils":11},"Обществознание":{"grade":3.7,"pupils":43},"История":{"grade":4,"pupils":3},"Биология":{"grade":3.9,"pupils":10},"Химия":{"grade":4,"pupils":8},"Математика":{"grade":3.4,"pupils":156},"Английский":{"grade":3.8,"pupils":21},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":3.6,"pupils":11},"География":{"grade":3.3,"pupils":7},"Русский":{"grade":4,"pupils":156}},"year":2015,"report":"http://sch1566.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014-2015.pdf","coordinates":{"latitude":55.647671,"longitude":37.748681},"ege":{},"pupils":2027},{"universities":{"МПГУ":0.05555555555555555,"РЭУ имени Плеханова":0.05555555555555555,"АФСБ РФ":0.027777777777777776,"МГУ":0.4444444444444444,"Институт бизнеса и дизайна":0.027777777777777776},"name":"Школа №283","gia":{"Физика":{"grade":3.5,"pupils":11},"Обществознание":{"grade":3.6,"pupils":69},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.8,"pupils":17},"Химия":{"grade":4.3,"pupils":12},"Математика":{"grade":3.6,"pupils":178},"Английский":{"grade":4.2,"pupils":29},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.1,"pupils":20},"География":{"grade":4.1,"pupils":9},"Русский":{"grade":4,"pupils":178}},"year":2015,"report":"http://sch283sv-new.mskobr.ru/files/publichnyj_otchyot_2014-1015.pdf","coordinates":{"latitude":55.88928,"longitude":37.670932},"ege":{},"pupils":2500},{"universities":{"МАрхИ":0.1,"ИБХ РАН":0.05,"МГУ":0.35,"НИУ ВШЭ":0.1,"МГТУ имени Баумана":0.05},"name":"Школа №1498 ","gia":{"Физика":{"grade":4,"pupils":5},"Обществознание":{"grade":4.1,"pupils":24},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":5},"Химия":{"grade":4.8,"pupils":9},"Математика":{"grade":4.1,"pupils":89},"Английский":{"grade":4.3,"pupils":43},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.6,"pupils":8},"География":{"grade":4,"pupils":12},"Русский":{"grade":4.4,"pupils":89}},"year":2015,"report":"http://sch1498.mskobr.ru/files/attach_files/publichnyj_doklad_1415.docx","coordinates":{"latitude":55.694124,"longitude":37.507026},"ege":{},"pupils":1280},{"universities":{"МТИ":0.5,"МГУ":0.5},"name":"Школа №2101 ","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":3.2,"pupils":9},"История":{"grade":3.8,"pupils":5},"Биология":{"grade":3.5,"pupils":2},"Химия":{"grade":4,"pupils":1},"Математика":{"grade":3.5,"pupils":196},"Английский":{"grade":3.9,"pupils":24},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":3.3,"pupils":3},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":3.8,"pupils":192}},"year":2014,"report":"http://sch2101.mskobr.ru/files/261/public_report_karpov_2013-2014.pdf","coordinates":{"latitude":55.73626,"longitude":37.462694},"ege":{},"pupils":2660},{"universities":{"НИУ ВШЭ":0.041666666666666664,"МПГУ":0.08333333333333333,"МТУСИ":0.08333333333333333,"МГУ":0.4583333333333333,"МИРЭА":0.08333333333333333},"name":"Школа №1467","gia":{"Физика":{"grade":3.9,"pupils":8},"Обществознание":{"grade":3.8,"pupils":38},"История":{"grade":3.1,"pupils":7},"Биология":{"grade":3.2,"pupils":30},"Химия":{"grade":4.4,"pupils":10},"Математика":{"grade":3.6,"pupils":99},"Английский":{"grade":4.5,"pupils":10},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":4.4,"pupils":7},"География":{"grade":3.9,"pupils":7},"Русский":{"grade":3.8,"pupils":99}},"year":2014,"report":"http://www.youblisher.com/p/959156-%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9-%D0%BE%D1%82%D1%87%D0%B5%D1%82-%D1%80%D1%83%D0%BA%D0%BE%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D0%B5%D0%BB%D1%8F-%D0%93%D0%91%D0%9E%D0%A3-%D0%A1%D0%9E%D0%A8-1467-%D0%91%D0%B5%D0%BB%D1%8F%D0%B5%D0%B2%D0%BE%D0%B9-%D0%A2%D0%B0%D1%82%D1%8C%D1%8F%D0%BD%D1%8B-%D0%92%D0%BB%D0%B0%D0%B4%D0%B8%D0%BC%D0%B8%D1%80%D0%BE%D0%B2%D0%BD%D1%8B-%D0%B7%D0%B0-2013-2014-%D0%B3%D0%BE%D0%B4/","coordinates":{"latitude":55.638866,"longitude":37.347656},"ege":{},"pupils":1240},{"universities":{"МЭСИ":0.07142857142857142,"РАНХиГС при Президенте РФ":0.14285714285714285,"МГУ":0.21428571428571427,"РУДН":0.07142857142857142,"МГИМО":0.07142857142857142},"name":"Школа №1238","gia":{"Физика":{"grade":3.7,"pupils":7},"Обществознание":{"grade":3.8,"pupils":35},"История":{"grade":3.7,"pupils":7},"Биология":{"grade":3.3,"pupils":3},"Химия":{"grade":3,"pupils":1},"Английский":{"grade":4.6,"pupils":58},"Математика":{"grade":3.9,"pupils":128},"Информатика":{"grade":4.4,"pupils":34},"География":{"grade":3,"pupils":2},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":128}},"year":2015,"report":"https://drive.google.com/file/d/0B5fArHnrCPDYQy03WmgzMHRBZkE/view","coordinates":{"latitude":55.645207,"longitude":37.345616},"ege":{},"pupils":1060},{"universities":{},"name":"Гимназия №1797 ","gia":{"Физика":{"grade":4,"pupils":7},"Обществознание":{"grade":3.7,"pupils":23},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.2,"pupils":6},"Химия":{"grade":3.5,"pupils":6},"Английский":{"grade":3.9,"pupils":23},"Математика":{"grade":3.6,"pupils":154},"Информатика":{"grade":4.3,"pupils":7},"Немецкий":{"grade":3.7,"pupils":27},"Русский":{"grade":4.2,"pupils":154}},"year":2015,"report":"http://gym1797.mskobr.ru/files/doc_1/publichnyj_doklad_2015_d.pdf","coordinates":{"latitude":55.808467,"longitude":37.711779},"ege":{},"pupils":2240},{"universities":{"МГСУ НИУ":0.05357142857142857,"Финансовый университет":0.05357142857142857,"Первый МГМУ имени Сеченова":0.05357142857142857,"МГУ":0.21428571428571427,"МГУПС":0.05357142857142857},"name":"Школа №763","gia":{"Физика":{"grade":4,"pupils":27},"Обществознание":{"grade":4,"pupils":65},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.8,"pupils":21},"Химия":{"grade":4.3,"pupils":12},"Математика":{"grade":3.9,"pupils":188},"Английский":{"grade":4.3,"pupils":33},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":3.9,"pupils":20},"География":{"grade":3.7,"pupils":6},"Русский":{"grade":4.1,"pupils":188}},"year":2015,"report":"http://sch763sv-new.mskobr.ru/report/","coordinates":{"latitude":55.884181,"longitude":37.693426},"ege":{},"pupils":2380},{"universities":{"ГАУГН":1},"name":"Школа №2116 ","gia":{"Физика":{"grade":3.8,"pupils":28},"Обществознание":{"grade":4.2,"pupils":20},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":6},"Химия":{"grade":4.6,"pupils":10},"Математика":{"grade":3.9,"pupils":215},"Английский":{"grade":4.3,"pupils":22},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.6,"pupils":50},"География":{"grade":4.5,"pupils":4},"Русский":{"grade":4,"pupils":214}},"year":2015,"report":"http://sch2116.mskobr.ru/files/publichnyj_doklad.pdf","coordinates":{"latitude":55.620337,"longitude":37.75497},"ege":{},"pupils":2640},{"universities":{"АПУ при ИГиП РАН":0.037037037037037035,"РЭУ имени Плеханова":0.05555555555555555,"МГУ":0.3333333333333333,"МГЮА имени Кутафина":0.037037037037037035,"РГСУ":0.037037037037037035},"name":"Центр образования №1296","gia":{"Физика":{"grade":3.8,"pupils":5},"Обществознание":{"grade":4.4,"pupils":11},"Биология":{"grade":3.6,"pupils":5},"Химия":{"grade":3.8,"pupils":6},"Английский":{"grade":4.5,"pupils":39},"Математика":{"grade":4.2,"pupils":87},"Информатика":{"grade":5,"pupils":1},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.3,"pupils":89}},"year":2015,"report":"http://cos1296.mskobr.ru/files/_%D0%BE%D1%82%D1%87%D0%B5%D1%82_%E2%84%961296%283%29.pdf","coordinates":{"latitude":55.877344,"longitude":37.562694},"ege":{},"pupils":960},{"universities":{"МЭИ":0.03389830508474576,"НИЯУ МИФИ":0.03389830508474576,"МГУ":0.3389830508474576,"НИУ ВШЭ":0.05084745762711865,"МГТУ имени Баумана":0.03389830508474576},"name":"Гимназия №1811 ","gia":{"Физика":{"grade":3.9,"pupils":29},"Обществознание":{"grade":3.7,"pupils":85},"История":{"grade":3.2,"pupils":5},"Биология":{"grade":3.5,"pupils":23},"Химия":{"grade":3.9,"pupils":14},"Математика":{"grade":3.8,"pupils":282},"Английский":{"grade":4,"pupils":51},"Литература":{"grade":4.3,"pupils":6},"Информатика":{"grade":4.4,"pupils":38},"География":{"grade":3.8,"pupils":5},"Русский":{"grade":4,"pupils":282}},"year":2015,"report":"http://1811.mskobr.ru/files/Doki/Publ.Otchet/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%201811%202014-15%20%D1%83.%D0%B3..pdf","coordinates":{"latitude":55.793905,"longitude":37.814726},"ege":{"Физика":{"grade":64,"pupils":1},"Обществознание":{"grade":61,"pupils":91},"История":{"grade":55,"pupils":29},"Биология":{"grade":60,"pupils":35},"Английский":{"grade":73,"pupils":34},"Химия":{"grade":59,"pupils":31},"Литература":{"grade":57,"pupils":17},"Французский":{"grade":29,"pupils":58.9},"Математика":{"grade":50,"pupils":128},"Информатика":{"grade":64,"pupils":11},"Русский":{"grade":74,"pupils":165}},"pupils":3336},{"universities":{"Финансовый университет":0.07692307692307693,"РАНХиГС при Президенте РФ":0.038461538461538464,"МГУ":0.375,"НИУ ВШЭ":0.038461538461538464,"МГИМО":0.038461538461538464},"name":"Школа №1223 ","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":4.3,"pupils":10},"История":{"grade":3,"pupils":1},"Химия":{"grade":5,"pupils":2},"Английский":{"grade":4.4,"pupils":104},"Математика":{"grade":4.3,"pupils":104},"Информатика":{"grade":3.5,"pupils":2},"Русский":{"grade":4.3,"pupils":104}},"year":2015,"report":"http://sch1223s.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%821223.pdf","coordinates":{"latitude":55.83846,"longitude":37.527229},"ege":{"Русский":{"grade":79,"pupils":79},"Математика":{"grade":54,"pupils":null},"Химия":{"grade":66,"pupils":7},"Обществознание":{"grade":70,"pupils":45},"Литература":{"grade":66,"pupils":7}},"pupils":1240},{"universities":{"РАНХиГС при Президенте РФ":1},"name":"Многопрофильный лицей №1799","gia":{"Физика":{"grade":4,"pupils":5},"Обществознание":{"grade":4.2,"pupils":95},"История":{"grade":3.5,"pupils":14},"Биология":{"grade":4.3,"pupils":4},"Химия":{"grade":4.3,"pupils":12},"Математика":{"grade":4.2,"pupils":208},"Английский":{"grade":4.4,"pupils":132},"Литература":{"grade":4.6,"pupils":5},"Информатика":{"grade":4.7,"pupils":17},"География":{"grade":4.8,"pupils":4},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.4,"pupils":208}},"year":2015,"report":"http://lic1799.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20-%202015.pdf","coordinates":{"latitude":55.744171,"longitude":37.621435},"ege":{},"pupils":2913},{"universities":{"АГЗ МЧС России":0.0335195530726257,"Финансовый университет":0.03910614525139665,"РАНХиГС при Президенте РФ":0.055865921787709494,"МГУ":0.5195530726256983,"АПИ при ИГиП РАН":0.027932960893854747},"name":"Школа №2123 имени Мигеля Эрнандеса","gia":{"Физика":{"grade":3.6,"pupils":9},"Обществознание":{"grade":3.5,"pupils":12},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.6,"pupils":7},"Химия":{"grade":3.9,"pupils":7},"Математика":{"grade":4,"pupils":127},"Английский":{"grade":4.3,"pupils":23},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.1,"pupils":17},"Испанский":{"grade":4.5,"pupils":20},"География":{"grade":3.7,"pupils":9},"Русский":{"grade":4.1,"pupils":128}},"year":2014,"report":"http://2123.mskobr.ru/report/","coordinates":{"latitude":55.756756,"longitude":37.594755},"ege":{},"pupils":2840},{"universities":{},"name":"Воробьевы горы","gia":{"Физика":{"grade":3.7,"pupils":14},"Обществознание":{"grade":4,"pupils":14},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4.1,"pupils":24},"Химия":{"grade":4.2,"pupils":22},"Математика":{"grade":3.9,"pupils":100},"Английский":{"grade":4.2,"pupils":35},"Литература":{"grade":3.8,"pupils":6},"Информатика":{"grade":5,"pupils":1},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.1,"pupils":98}},"year":2015,"report":"http://lycg1525.mskobr.ru/files/public_report_2014-20151.pdf","coordinates":{"latitude":55.703038,"longitude":37.554457},"ege":{},"pupils":1560},{"universities":{"МПГУ":0.08333333333333333,"Финансовый университет":0.027777777777777776,"МГУ":0.5555555555555556,"МИТХТ":0.027777777777777776,"ГУУ":0.027777777777777776},"name":"Школа №1434 ","gia":{"Физика":{"grade":3.5,"pupils":22},"Обществознание":{"grade":3.8,"pupils":49},"История":{"grade":4,"pupils":8},"Биология":{"grade":3.8,"pupils":18},"Химия":{"grade":4.2,"pupils":19},"Математика":{"grade":3.8,"pupils":118},"Английский":{"grade":4.7,"pupils":18},"Литература":{"grade":4.2,"pupils":5},"Информатика":{"grade":4.6,"pupils":25},"География":{"grade":3.5,"pupils":11},"Русский":{"grade":4.1,"pupils":118}},"year":2014,"report":"https://yadi.sk/i/fh9aqK2TbuSMF","coordinates":{"latitude":55.690461,"longitude":37.500405},"ege":{"Физика":{"grade":71,"pupils":11},"Обществознание":{"grade":62,"pupils":25},"История":{"grade":48,"pupils":4},"Биология":{"grade":77,"pupils":17},"Химия":{"grade":76,"pupils":11},"Литература":{"grade":72,"pupils":2},"Английский":{"grade":75,"pupils":13},"Математика":{"grade":57,"pupils":51},"Информатика":{"grade":81,"pupils":6},"Русский":{"grade":79,"pupils":51}},"pupils":806},{"universities":{"Финансовый университет":0.04878048780487805,"РАНХиГС при Президенте РФ":0.04878048780487805,"МИТХТ":0.04878048780487805,"МАДИ":0.07317073170731707,"МГУ":0.4146341463414634},"name":"Школа №1002","gia":{"Физика":{"grade":3.6,"pupils":7},"Обществознание":{"grade":3.6,"pupils":46},"Биология":{"grade":3.5,"pupils":16},"Химия":{"grade":4.1,"pupils":21},"Английский":{"grade":3.9,"pupils":11},"Математика":{"grade":3.3,"pupils":145},"Информатика":{"grade":4.3,"pupils":12},"География":{"grade":3.8,"pupils":23},"Русский":{"grade":3.8,"pupils":145}},"year":2015,"report":"http://sch1002.mskobr.ru/files/publichnyj_otchet_gbou_shkola_1002.pdf","coordinates":{"latitude":55.652883,"longitude":37.402228},"ege":{},"pupils":1720},{"universities":{"МПГУ":0.046153846153846156,"Первый МГМУ имени Сеченова":0.03076923076923077,"РАНХиГС при Президенте РФ":0.046153846153846156,"МГУ":0.35384615384615387,"РУДН":0.06153846153846154},"name":"Гимназия №1542","gia":{"Физика":{"grade":3.8,"pupils":21},"Обществознание":{"grade":4,"pupils":84},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":3.8,"pupils":12},"Химия":{"grade":4.4,"pupils":23},"Математика":{"grade":3.8,"pupils":185},"Английский":{"grade":4.2,"pupils":92},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.4,"pupils":11},"География":{"grade":3.5,"pupils":26},"Русский":{"grade":4.2,"pupils":186}},"year":2015,"report":"http://www.youblisher.com/p/1188329-Doklad1542/","coordinates":{"latitude":55.646584,"longitude":37.399964},"ege":{"Физика":{"grade":58,"pupils":20},"Обществознание":{"grade":62,"pupils":85},"История":{"grade":50,"pupils":20},"Биология":{"grade":64,"pupils":15},"Химия":{"grade":66,"pupils":15},"Литература":{"grade":68,"pupils":5},"Английский":{"grade":65,"pupils":45},"Математика":{"grade":52,"pupils":99},"Информатика":{"grade":66,"pupils":15},"Русский":{"grade":74,"pupils":128}},"pupils":2774},{"universities":{"МГСУ НИУ":0.04878048780487805,"Финансовый университет":0.04878048780487805,"МГУ":0.2682926829268293,"РУДН":0.04878048780487805,"МГТУ имени Баумана":0.04878048780487805},"name":"Школа №887","gia":{"Физика":{"grade":3.6,"pupils":16},"Обществознание":{"grade":3.8,"pupils":48},"История":{"grade":3.7,"pupils":9},"Биология":{"grade":3.4,"pupils":5},"Химия":{"grade":3.8,"pupils":6},"Математика":{"grade":3.4,"pupils":183},"Английский":{"grade":4.3,"pupils":20},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4.3,"pupils":32},"География":{"grade":4,"pupils":8},"Немецкий":{"grade":3.5,"pupils":2},"Русский":{"grade":3.8,"pupils":185}},"year":2015,"report":"http://sch887.mskobr.ru/files/docs/raznoe/15_16/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202014-2015%20%D1%81%20%D0%B2%D0%BE%D1%81%D0%BF.%20%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%BE%D0%B9.pdf","coordinates":{"latitude":55.731997,"longitude":37.439706},"ege":{},"pupils":2620},{"universities":{"Финансовый университет":0.0196078431372549,"МИИТ":0.058823529411764705,"МГЛУ":0.0196078431372549,"МГУ":0.47058823529411764,"АМИ":0.0392156862745098},"name":"Лицей №507","gia":{"Физика":{"grade":3.7,"pupils":21},"Обществознание":{"grade":3.8,"pupils":51},"История":{"grade":3.1,"pupils":9},"Биология":{"grade":3.5,"pupils":33},"Химия":{"grade":4,"pupils":21},"Математика":{"grade":3.7,"pupils":156},"Английский":{"grade":4.1,"pupils":15},"Литература":{"grade":3.8,"pupils":4},"Информатика":{"grade":4.1,"pupils":34},"География":{"grade":3.2,"pupils":5},"Русский":{"grade":4,"pupils":154}},"year":2014,"report":"http://lyc507u.mskobr.ru/files/publ_doklad.pdf","coordinates":{"latitude":55.668635,"longitude":37.653748},"ege":{},"pupils":2080},{"universities":{},"name":"Школа №2121 ","gia":{"Физика":{"grade":3.6,"pupils":16},"Обществознание":{"grade":3.8,"pupils":61},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3.4,"pupils":24},"Химия":{"grade":3.7,"pupils":14},"Математика":{"grade":3.4,"pupils":222},"Английский":{"grade":3.7,"pupils":28},"Литература":{"grade":3.7,"pupils":6},"Информатика":{"grade":4.1,"pupils":18},"География":{"grade":3,"pupils":1},"Русский":{"grade":3.6,"pupils":222}},"year":2014,"report":"http://sch2121.mskobr.ru/report/","coordinates":{"latitude":55.67926,"longitude":37.751987},"ege":{},"pupils":1940},{"universities":{"МПГУ":0.032520325203252036,"МФТИ":0.04878048780487805,"РАНХиГС при Президенте РФ":0.04065040650406504,"МГУ":0.2682926829268293,"МГТУ имени Баумана":0.21138211382113822},"name":"Школа №444","gia":{"Физика":{"grade":4.2,"pupils":33},"Обществознание":{"grade":4.3,"pupils":19},"Биология":{"grade":4.1,"pupils":10},"Химия":{"grade":4.3,"pupils":6},"Английский":{"grade":4.9,"pupils":8},"Математика":{"grade":4.8,"pupils":78},"Информатика":{"grade":4.8,"pupils":24},"Русский":{"grade":4.6,"pupils":78}},"year":2013,"report":"http://schv444.mskobr.ru/files/publichnyiy_doklad_2013.pdf","coordinates":{"latitude":55.790671,"longitude":37.796463},"ege":{},"pupils":1580},{"universities":{"МИЭП":0.020833333333333332,"Финансовый университет":0.020833333333333332,"МГУ":0.375,"МАрхИ":0.041666666666666664,"МГТУ имени Баумана":0.10416666666666667},"name":"Школа №1360","gia":{"Физика":{"grade":3.8,"pupils":10},"Обществознание":{"grade":3.6,"pupils":43},"История":{"grade":3,"pupils":1},"Биология":{"grade":5,"pupils":1},"Английский":{"grade":4.4,"pupils":8},"Химия":{"grade":5,"pupils":2},"Французский":{"grade":3,"pupils":1},"Математика":{"grade":3.7,"pupils":111},"Информатика":{"grade":4.5,"pupils":25},"География":{"grade":2,"pupils":1},"Русский":{"grade":3.7,"pupils":112}},"year":2014,"report":"http://sch1360v.mskobr.ru/report/","coordinates":{"latitude":55.812342,"longitude":37.702113},"ege":{},"pupils":2960},{"universities":{"Финансовый университет":0.041666666666666664,"МГТУ имени Баумана":0.041666666666666664,"МГУ":0.4375,"НИУ ВШЭ":0.041666666666666664,"МГИМО":0.041666666666666664},"name":"Школа №1862","gia":{"Физика":{"grade":4,"pupils":31},"Обществознание":{"grade":3.9,"pupils":44},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":3.8,"pupils":23},"Химия":{"grade":4.2,"pupils":33},"Математика":{"grade":3.8,"pupils":232},"Английский":{"grade":4.3,"pupils":72},"Литература":{"grade":4.2,"pupils":6},"Информатика":{"grade":4.3,"pupils":24},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4,"pupils":234}},"year":2014,"report":"http://schooltools.ru/files/7336.docx","coordinates":{"latitude":55.646457,"longitude":37.614267},"ege":{},"pupils":2200},{"universities":{"РГГУ":0.05,"РЭУ имени Плеханова":0.05,"МГУ":0.375,"РУДН":0.075,"ГИТР":0.05},"name":"Школа №1265","gia":{"Физика":{"grade":5,"pupils":1},"Обществознание":{"grade":4,"pupils":7},"Английский":{"grade":5,"pupils":1},"Химия":{"grade":4.6,"pupils":9},"Математика":{"grade":3.8,"pupils":42},"Французский":{"grade":4,"pupils":31},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4,"pupils":1},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.5,"pupils":42}},"year":2014,"report":"http://sch1265uz.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202013_2014_%D0%93%D0%91%D0%9E%D0%A3%20%D0%A1%D0%9E%D0%A8%201265.doc","coordinates":{"latitude":55.699071,"longitude":37.558266},"ege":{},"pupils":780},{"universities":{"НИУ ВШЭ":0.02,"Финансовый университет":0.08666666666666667,"РАНХиГС при Президенте РФ":0.04666666666666667,"МГУ":0.58,"АГПС МЧС России":0.02},"name":"Школа №1354","gia":{"Физика":{"grade":3.9,"pupils":25},"Обществознание":{"grade":3.9,"pupils":99},"История":{"grade":4,"pupils":6},"Биология":{"grade":3.6,"pupils":25},"Английский":{"grade":4.2,"pupils":105},"Химия":{"grade":4.4,"pupils":25},"Математика":{"grade":3.9,"pupils":255},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.3,"pupils":24},"География":{"grade":4.1,"pupils":18},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.2,"pupils":255}},"year":2014,"report":"http://sch1354uz.mskobr.ru/files/2003/otchet_za_2013-2014_uch_god.pdf","coordinates":{"latitude":55.548136,"longitude":37.563844},"ege":{"Физика":{"grade":51,"pupils":4},"Обществознание":{"grade":52,"pupils":13},"История":{"grade":54,"pupils":3},"Биология":{"grade":74,"pupils":12},"Химия":{"grade":74,"pupils":8},"Литература":{"grade":60,"pupils":3},"Математика":{"grade":42,"pupils":30},"Информатика":{"grade":56,"pupils":4},"Русский":{"grade":73,"pupils":30}},"pupils":2218},{"universities":{"МГМСУ":0.05263157894736842,"МГСУ НИУ":0.05263157894736842,"Финансовый университет":0.05263157894736842,"МГУ":0.3684210526315789,"МГТУ имени Баумана":0.07894736842105263},"name":"Гимназия №1583","gia":{"Физика":{"grade":4,"pupils":16},"Обществознание":{"grade":4,"pupils":32},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":8},"Английский":{"grade":4.1,"pupils":12},"Химия":{"grade":4.4,"pupils":7},"Математика":{"grade":3.8,"pupils":113},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3.7,"pupils":7},"Информатика":{"grade":4,"pupils":9},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.1,"pupils":112}},"year":2014,"report":"http://gym1583s-new.mskobr.ru/files/pub14.pdf","coordinates":{"latitude":55.849782,"longitude":37.494575},"ege":{"Физика":{"grade":63,"pupils":null},"Обществознание":{"grade":66,"pupils":null},"История":{"grade":72,"pupils":null},"Биология":{"grade":76,"pupils":null},"Химия":{"grade":76,"pupils":null},"Литература":{"grade":76,"pupils":null},"Английский":{"grade":68,"pupils":null},"Математика":{"grade":58,"pupils":null},"Информатика":{"grade":58,"pupils":null},"Русский":{"grade":77,"pupils":null}},"pupils":653},{"universities":{"Финансовый университет":0.06870229007633588,"АПИ при ИГиП РАН":0.030534351145038167,"РАНХиГС при Президенте РФ":0.06870229007633588,"МГУ":0.4732824427480916,"МГИМО":0.030534351145038167},"name":"Гимназия №1274","gia":{"Физика":{"grade":3.5,"pupils":2},"Обществознание":{"grade":3.7,"pupils":34},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.8,"pupils":9},"Химия":{"grade":4.3,"pupils":15},"Математика":{"grade":3.6,"pupils":155},"Английский":{"grade":4.3,"pupils":54},"Литература":{"grade":4.5,"pupils":4},"Информатика":{"grade":4.7,"pupils":11},"География":{"grade":4,"pupils":4},"Немецкий":{"grade":5,"pupils":1},"Русский":{"grade":4,"pupils":156}},"year":2014,"report":"http://gym1274uv.mskobr.ru/images/cms/PDF/publichnyj_otchet_za_2013-2014_uchebnyj_god.pdf","coordinates":{"latitude":55.723268,"longitude":37.671624},"ege":{},"pupils":2280},{"universities":{"РГАУ-МСХА имени Тимирязева":0.05555555555555555,"ИТиГ":0.05555555555555555,"МГУ":0.5,"МФЮА":0.1111111111111111,"МГЛУ":0.1111111111111111},"name":"Школа №1194","gia":{"Физика":{"grade":4,"pupils":27},"Обществознание":{"grade":3.7,"pupils":35},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.8,"pupils":13},"Химия":{"grade":4.1,"pupils":9},"Математика":{"grade":3.8,"pupils":157},"Английский":{"grade":3.9,"pupils":17},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4.4,"pupils":16},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":3.9,"pupils":157}},"year":2015,"report":"http://sch1194zg.mskobr.ru/files/main/Doklad/pub-doc-2015.pdf","coordinates":{"latitude":55.979903,"longitude":37.153691},"ege":{},"pupils":2680},{"universities":{"МГУПИ":0.045454545454545456,"ГУЗ":0.045454545454545456,"РАНХиГС при Президенте РФ":0.045454545454545456,"МГУ":0.3181818181818182,"МАДИ":0.030303030303030304},"name":"Гимназия №1748 ","gia":{"Физика":{"grade":3.8,"pupils":9},"Обществознание":{"grade":3.8,"pupils":44},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":4,"pupils":6},"Химия":{"grade":4.2,"pupils":9},"Английский":{"grade":4,"pupils":20},"Математика":{"grade":3.6,"pupils":151},"Информатика":{"grade":4,"pupils":15},"География":{"grade":5,"pupils":1},"Русский":{"grade":4,"pupils":150}},"year":2015,"report":"http://gym1748v.mskobr.ru/files/publichnyj_doklad_rukovoditelya.pdf","coordinates":{"latitude":55.804855,"longitude":37.827841},"ege":{},"pupils":2040},{"universities":{"Финансовый университет":0.05,"ИБПУ":0.05,"РЭУ имени Плеханова":0.05,"МГУ":0.45,"Первый МГМУ имени Сеченова":0.05},"name":"Школа №1384 имени Леманского","gia":{"Физика":{"grade":3.9,"pupils":10},"Обществознание":{"grade":3.8,"pupils":22},"Биология":{"grade":3.3,"pupils":6},"Химия":{"grade":3.8,"pupils":4},"Английский":{"grade":4.1,"pupils":9},"Математика":{"grade":3.9,"pupils":71},"Информатика":{"grade":4.5,"pupils":11},"Русский":{"grade":3.9,"pupils":72}},"year":2015,"report":"http://sch1384.mskobr.ru/report/","coordinates":{"latitude":55.798272,"longitude":37.515461},"ege":{},"pupils":960},{"universities":{"Финансовый университет":0.06329113924050633,"АМИ":0.0379746835443038,"МГУ":0.4050632911392405,"НИУ ВШЭ":0.06329113924050633,"МГЛУ":0.05063291139240506},"name":"Гимназия №1505 ","gia":{"Физика":{"grade":3,"pupils":8},"Обществознание":{"grade":3.5,"pupils":27},"История":{"grade":5,"pupils":1},"Биология":{"grade":3.3,"pupils":13},"Химия":{"grade":3.8,"pupils":4},"Математика":{"grade":3.9,"pupils":164},"Английский":{"grade":4.5,"pupils":68},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.4,"pupils":19},"География":{"grade":3,"pupils":3},"Русский":{"grade":4.1,"pupils":160}},"year":2015,"report":"http://gym1505v.mskobr.ru/files/2015_public_repot_14-15.pdf","coordinates":{"latitude":55.795575,"longitude":37.728595},"ege":{},"pupils":2800},{"universities":{"Финансовый университет":0.04,"РГАУ-МСХА имени Тимирязева":0.04,"МГУ":0.28,"РУДН":0.04,"РХТУ имени Менделеева":0.04},"name":"Школа №1430 имени Кисунько","gia":{"Физика":{"grade":4,"pupils":8},"Обществознание":{"grade":4.2,"pupils":47},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.9,"pupils":8},"Химия":{"grade":4.6,"pupils":18},"Математика":{"grade":3.9,"pupils":113},"Английский":{"grade":4.2,"pupils":38},"Литература":{"grade":5,"pupils":2},"Информатика":{"grade":4.2,"pupils":10},"География":{"grade":4.2,"pupils":6},"Русский":{"grade":4.2,"pupils":110}},"year":2015,"report":"http://sch1430sv-new.mskobr.ru/files/publichnyj_otchet_za_2014-2015_uchebnyj_god_gbou_shkola_14301.pdf","coordinates":{"latitude":55.900567,"longitude":37.578029},"ege":{},"pupils":1860},{"universities":{"РГУФКСМиТ":0.03636363636363636,"РАНХиГС при Президенте РФ":0.05454545454545454,"МЭСИ":0.03636363636363636,"МАДИ":0.05454545454545454,"МГУ":0.41818181818181815},"name":"Школа №1195","gia":{"Физика":{"grade":3.7,"pupils":11},"Обществознание":{"grade":3.7,"pupils":36},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.7,"pupils":18},"Химия":{"grade":3.8,"pupils":11},"Математика":{"grade":3.7,"pupils":145},"Английский":{"grade":3.9,"pupils":28},"Литература":{"grade":3.6,"pupils":5},"Информатика":{"grade":3.9,"pupils":13},"География":{"grade":3.9,"pupils":14},"Русский":{"grade":4,"pupils":145}},"year":2014,"report":"http://sch1195.mskobr.ru/report/","coordinates":{"latitude":55.716174,"longitude":37.415981},"ege":{},"pupils":1820},{"universities":{"РНИМУ имени Пирогова":0.025,"МФТИ":0.05,"РАНХиГС при Президенте РФ":0.05,"МГУ":0.425,"НИУ ВШЭ":0.25},"name":"Школа-интернат ","gia":{"Физика":{"grade":4,"pupils":4},"Обществознание":{"grade":3.5,"pupils":2},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.3,"pupils":3},"Английский":{"grade":4.5,"pupils":11},"Химия":{"grade":4.7,"pupils":3},"Французский":{"grade":4,"pupils":1},"Математика":{"grade":4.6,"pupils":38},"Информатика":{"grade":4.2,"pupils":5},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.5,"pupils":38}},"year":2014,"report":"http://int.mskobr.ru/report/","coordinates":{"latitude":55.718253,"longitude":37.464607},"ege":{"Физика":{"grade":77,"pupils":14},"Обществознание":{"grade":74,"pupils":8},"История":{"grade":77,"pupils":6},"Биология":{"grade":86,"pupils":14},"Химия":{"grade":83,"pupils":16},"Литература":{"grade":69,"pupils":2},"Математика":{"grade":68,"pupils":37},"Информатика":{"grade":83,"pupils":4},"Русский":{"grade":83,"pupils":37}},"pupils":279},{"universities":{"МГИМО":0.036585365853658534,"Первый МГМУ имени Сеченова":0.036585365853658534,"РАНХиГС при Президенте РФ":0.036585365853658534,"МГУ":0.43902439024390244,"РУДН":0.04878048780487805},"name":"Гимназия №1507","gia":{"Физика":{"grade":4,"pupils":10},"Обществознание":{"grade":4.2,"pupils":33},"История":{"grade":4,"pupils":1},"Биология":{"grade":5,"pupils":2},"Английский":{"grade":4.6,"pupils":40},"Химия":{"grade":4.6,"pupils":7},"Математика":{"grade":3.9,"pupils":117},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.7,"pupils":3},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.1,"pupils":121}},"year":2015,"report":"http://gym1507uz.mskobr.ru/files/publichnyj_otchet_gimnazii_1507_za_2014-2015.pdf","coordinates":{"latitude":55.630868,"longitude":37.507295},"ege":{"Физика":{"grade":58,"pupils":18},"Обществознание":{"grade":64,"pupils":52},"История":{"grade":59,"pupils":17},"Биология":{"grade":68,"pupils":15},"Химия":{"grade":66,"pupils":11},"Литература":{"grade":60,"pupils":9},"Английский":{"grade":81,"pupils":32},"Математика":{"grade":56,"pupils":55},"Информатика":{"grade":64,"pupils":7},"География":{"grade":56,"pupils":6},"Русский":{"grade":77,"pupils":90}},"pupils":1627},{"universities":{},"name":"Школа №1206","gia":{"Физика":{"grade":3.7,"pupils":3},"Обществознание":{"grade":3.3,"pupils":3},"Биология":{"grade":3,"pupils":2},"Химия":{"grade":5,"pupils":2},"Английский":{"grade":4.7,"pupils":44},"Математика":{"grade":3.6,"pupils":91},"Русский":{"grade":4.1,"pupils":91}},"year":2015,"report":"http://sch1206uz.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%20-%202015.pdf","coordinates":{"latitude":55.614953,"longitude":37.5334},"ege":{},"pupils":1260},{"universities":{"АГЗ МЧС России":0.019011406844106463,"Финансовый университет":0.09885931558935361,"РАНХиГС при Президенте РФ":0.045627376425855515,"МГУ":0.5285171102661597,"АПИ при ИГиП РАН":0.049429657794676805},"name":"Гимназия №45 имени Мильграма","gia":{"Физика":{"grade":3.8,"pupils":4},"Обществознание":{"grade":3.6,"pupils":25},"История":{"grade":2,"pupils":1},"Биология":{"grade":3.4,"pupils":10},"Английский":{"grade":4.3,"pupils":41},"Химия":{"grade":4.5,"pupils":6},"Французский":{"grade":3,"pupils":1},"Математика":{"grade":3.7,"pupils":189},"Информатика":{"grade":4.5,"pupils":6},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":4.5,"pupils":2},"Русский":{"grade":4,"pupils":189}},"year":2013,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={6722ADB6-AC2D-44E8-9213-58DEDCDCF884}&name=samoobsledov_45.pdf","coordinates":{"latitude":55.690654,"longitude":37.579744},"ege":{"Физика":{"grade":59,"pupils":7},"Обществознание":{"grade":72,"pupils":28},"История":{"grade":65,"pupils":11},"Биология":{"grade":84,"pupils":8},"Английский":{"grade":86,"pupils":42},"Химия":{"grade":81,"pupils":8},"Литература":{"grade":66,"pupils":5},"Французский":{"grade":80,"pupils":2},"Математика":{"grade":61,"pupils":null},"Информатика":{"grade":85,"pupils":3},"Немецкий":{"grade":57,"pupils":1},"Русский":{"grade":80,"pupils":null}},"pupils":788},{"universities":{"Финансовый университет":0.03007518796992481,"АГПС":0.022556390977443608,"МГУ":0.44360902255639095,"НИУ ВШЭ":0.03007518796992481,"АМИ":0.03007518796992481},"name":"Школа №1234","gia":{"Физика":{"grade":3.3,"pupils":3},"Обществознание":{"grade":3.8,"pupils":54},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.9,"pupils":8},"Химия":{"grade":4.1,"pupils":18},"Математика":{"grade":3.8,"pupils":147},"Английский":{"grade":4.1,"pupils":77},"Литература":{"grade":4.2,"pupils":6},"Информатика":{"grade":4.7,"pupils":18},"География":{"grade":4.7,"pupils":6},"Немецкий":{"grade":4.3,"pupils":40},"Русский":{"grade":4.2,"pupils":146}},"year":2015,"report":"http://sch1234c.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%20%D0%93%D0%9E%D0%A3%20%D0%A1%D0%9E%D0%A8%201234%202014-2015%282%29.doc","coordinates":{"latitude":55.753463,"longitude":37.59012},"ege":{},"pupils":1250},{"universities":{"РГГУ":0.0851063829787234,"Финансовый университет":0.0425531914893617,"МГУ":0.2978723404255319,"ГУУ":0.06382978723404255,"МГЛУ":0.0425531914893617},"name":"Школа №1270","gia":{"Физика":{"grade":3.7,"pupils":6},"Обществознание":{"grade":4,"pupils":28},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.8,"pupils":4},"Английский":{"grade":4.8,"pupils":40},"Математика":{"grade":4.1,"pupils":56},"Информатика":{"grade":4.3,"pupils":6},"География":{"grade":4,"pupils":1},"Русский":{"grade":4.4,"pupils":56}},"year":2015,"report":"http://sch1270c.mskobr.ru/files/publ_doklad_14-15.docx","coordinates":{"latitude":55.743796,"longitude":37.664824},"ege":{},"pupils":1240},{"universities":{"МПГУ":0.07142857142857142,"АТиСО":0.10714285714285714,"РНИМУ имени Пирогова":0.03571428571428571,"МГУ":0.42857142857142855,"МГУТУ имени Разумовского":0.03571428571428571},"name":"Школа №2025","gia":{"Физика":{"grade":3.5,"pupils":14},"Обществознание":{"grade":3.4,"pupils":77},"История":{"grade":3,"pupils":4},"Биология":{"grade":3.9,"pupils":15},"Химия":{"grade":3.8,"pupils":14},"Математика":{"grade":3.5,"pupils":221},"Английский":{"grade":4,"pupils":31},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":3.8,"pupils":10},"География":{"grade":4.5,"pupils":4},"Русский":{"grade":3.8,"pupils":221}},"year":2015,"report":"http://sch2025.mskobr.ru/files/samoobsled_2014_15.pdf","coordinates":{"latitude":55.677514,"longitude":37.446021},"ege":{},"pupils":2540},{"universities":{"Финансовый университет":0.044444444444444446,"МИТХТ":0.044444444444444446,"МГУ":0.3111111111111111,"НИУ ВШЭ":0.044444444444444446,"БГИИК":0.022222222222222223},"name":"Гимназия №1565 ","gia":{"Физика":{"grade":3.6,"pupils":11},"Обществознание":{"grade":3.4,"pupils":30},"История":{"grade":2.8,"pupils":4},"Биология":{"grade":3.8,"pupils":15},"Химия":{"grade":4,"pupils":20},"Английский":{"grade":4.3,"pupils":69},"Математика":{"grade":3.6,"pupils":264},"Информатика":{"grade":4.4,"pupils":11},"География":{"grade":4,"pupils":2},"Русский":{"grade":4.1,"pupils":264}},"year":2015,"report":"http://gym1565sv.mskobr.ru/files/doklad_2015_n1.docx","coordinates":{"latitude":55.852799,"longitude":37.642186},"ege":{"Физика":{"grade":54,"pupils":null},"Обществознание":{"grade":56,"pupils":null},"История":{"grade":50,"pupils":null},"Биология":{"grade":64,"pupils":null},"Химия":{"grade":74,"pupils":null},"Литература":{"grade":58,"pupils":null},"Английский":{"grade":75,"pupils":null},"Математика":{"grade":55,"pupils":null},"Информатика":{"grade":58,"pupils":null},"География":{"grade":72,"pupils":null},"Русский":{"grade":76,"pupils":null}},"pupils":5409},{"universities":{"ГАУГН":0.03508771929824561,"РЭУ имени Плеханова":0.05263157894736842,"МГУ":0.38596491228070173,"РУДН":0.05263157894736842,"РНИМУ":0.03508771929824561},"name":"Школа №1273","gia":{"Физика":{"grade":3.9,"pupils":12},"Обществознание":{"grade":3.8,"pupils":54},"История":{"grade":3,"pupils":1},"Биология":{"grade":4,"pupils":21},"Химия":{"grade":4.3,"pupils":4},"Литература":{"grade":4.4,"pupils":5},"Английский":{"grade":4.3,"pupils":51},"Математика":{"grade":4,"pupils":133},"Информатика":{"grade":4.4,"pupils":10},"География":{"grade":4.1,"pupils":8},"Русский":{"grade":4.1,"pupils":132}},"year":2015,"report":"http://sch1273uz.mskobr.ru/files/publichnyj_doklad_2014-2015.pdf","coordinates":{"latitude":55.628972,"longitude":37.522522},"ege":{},"pupils":2200},{"universities":{"МФТИ":0.041666666666666664,"РУДН":0.041666666666666664,"Первый МГМУ имени Сеченова":0.041666666666666664,"МГУ":0.2916666666666667,"РГАУ-МСХА имени Тимирязева":0.10416666666666667},"name":"Гимназия №1573","gia":{"Физика":{"grade":3.3,"pupils":8},"Обществознание":{"grade":4.1,"pupils":47},"История":{"grade":3.8,"pupils":5},"Биология":{"grade":3.3,"pupils":3},"Химия":{"grade":4.3,"pupils":11},"Математика":{"grade":4,"pupils":124},"Английский":{"grade":4.3,"pupils":79},"Литература":{"grade":4.4,"pupils":5},"Информатика":{"grade":4.2,"pupils":17},"География":{"grade":5,"pupils":1},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4,"pupils":124}},"year":2014,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={D3C7832C-F3AA-4829-BAA5-83DBF740891A}&name=%D0%A1amoanaliz-raboty-%D0%93%D0%91%D0%9E%D0%A3-gimnazii-%E2%84%961573--za-2013-2014-uchebnyy-god(1).pdf","coordinates":{"latitude":55.906582,"longitude":37.552975},"ege":{"Физика":{"grade":52,"pupils":null},"Обществознание":{"grade":61,"pupils":null},"История":{"grade":58,"pupils":null},"Биология":{"grade":67,"pupils":null},"Химия":{"grade":63,"pupils":null},"Литература":{"grade":49,"pupils":null},"Английский":{"grade":74,"pupils":null},"Математика":{"grade":49,"pupils":null},"Информатика":{"grade":67,"pupils":null},"Русский":{"grade":69,"pupils":null}},"pupils":368},{"universities":{"РУДН":0.05714285714285714,"РЭУ имени Плеханова":0.11428571428571428,"МГУ":0.37142857142857144,"НИУ ВШЭ":0.08571428571428572,"МАИ":0.05714285714285714},"name":"Школа №1279","gia":{"Физика":{"grade":3.8,"pupils":5},"Обществознание":{"grade":3.7,"pupils":37},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3,"pupils":6},"Химия":{"grade":3.5,"pupils":4},"Математика":{"grade":3.9,"pupils":167},"Английский":{"grade":4.4,"pupils":75},"Литература":{"grade":3.7,"pupils":3},"Информатика":{"grade":4.2,"pupils":9},"География":{"grade":3,"pupils":14},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.1,"pupils":167}},"year":2015,"report":"http://sch1279.mskobr.ru/files/%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%BE%D1%82%D1%87%D0%B5%D1%82_2015.pdf","coordinates":{"latitude":55.663639,"longitude":37.603918},"ege":{},"pupils":2420},{"universities":{"МАТИ Циолковского":0.02702702702702703,"МГИМО":0.05405405405405406,"РАНХиГС при Президенте РФ":0.05405405405405406,"МГУ":0.32432432432432434,"НИУ ВШЭ":0.05405405405405406},"name":"Школа №1205","gia":{"Физика":{"grade":3.2,"pupils":5},"Обществознание":{"grade":3.1,"pupils":40},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.3,"pupils":4},"Химия":{"grade":3.7,"pupils":3},"Математика":{"grade":3.9,"pupils":127},"Английский":{"grade":4.5,"pupils":49},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":3.9,"pupils":21},"География":{"grade":4,"pupils":2},"Русский":{"grade":4,"pupils":129}},"year":2015,"report":"http://sch1205uz.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202014-2015%20%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9%20%D0%B3%D0%BE%D0%B4%20%D0%B2%D0%B0%D1%80%D0%B8%D0%B0%D0%BD%D1%82%203.pdf","coordinates":{"latitude":55.676844,"longitude":37.554376},"ege":{},"pupils":1980},{"universities":{"МГУП имени Федорова":0.03773584905660377,"Финансовый университет":0.05660377358490566,"РЭУ имени Плеханова":0.03773584905660377,"МГУ":0.41509433962264153,"МГТУ имени Баумана":0.03773584905660377},"name":"Школа №1411","gia":{"Физика":{"grade":3.3,"pupils":4},"Обществознание":{"grade":4,"pupils":37},"История":{"grade":4.7,"pupils":3},"Биология":{"grade":3.6,"pupils":5},"Английский":{"grade":4.4,"pupils":63},"Химия":{"grade":4.5,"pupils":15},"Математика":{"grade":3.9,"pupils":108},"Французский":{"grade":4,"pupils":2},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.4,"pupils":14},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":4.1,"pupils":106}},"year":2015,"report":"http://sch1411.mskobr.ru/files/publichnyj_doklad_20152016.pdf","coordinates":{"latitude":55.866531,"longitude":37.601367},"ege":{},"pupils":2920},{"universities":{"МЭСИ":0.03278688524590164,"Финансовый университет":0.03278688524590164,"РАНХиГС при Президенте РФ":0.04918032786885246,"МГУ":0.3770491803278688,"МГЛУ":0.04918032786885246},"name":"Школа №641 имени Сергея Есенина","gia":{"Физика":{"grade":3.7,"pupils":10},"Обществознание":{"grade":3.8,"pupils":15},"Биология":{"grade":4.2,"pupils":17},"Химия":{"grade":4.3,"pupils":21},"Английский":{"grade":4.4,"pupils":39},"Математика":{"grade":3.8,"pupils":183},"Информатика":{"grade":4.6,"pupils":14},"География":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":181}},"year":2015,"report":"http://sch641uv.mskobr.ru/files/%20%282%29.pdf","coordinates":{"latitude":55.704443,"longitude":37.75691},"ege":{},"pupils":1490},{"universities":{"АГЗ МЧС России":0.0379746835443038,"МГИМО":0.06329113924050633,"РАНХиГС при Президенте РФ":0.05063291139240506,"МГУ":0.43037974683544306,"МГАУ имени Горячкина":0.02531645569620253},"name":"Школа №1200","gia":{"Физика":{"grade":3.4,"pupils":7},"Обществознание":{"grade":3.6,"pupils":15},"Биология":{"grade":3.7,"pupils":3},"Химия":{"grade":4.9,"pupils":7},"Математика":{"grade":3.8,"pupils":120},"Английский":{"grade":4.5,"pupils":51},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.5,"pupils":13},"Русский":{"grade":4,"pupils":120}},"year":2015,"report":"http://sch1200.mskobr.ru/report/","coordinates":{"latitude":55.741906,"longitude":37.859219},"ege":{},"pupils":1980},{"universities":{"МЭИ":0.036585365853658534,"МГУПС":0.036585365853658534,"МГУ":0.32926829268292684,"ГУУ":0.036585365853658534,"АГПС МЧС России":0.036585365853658534},"name":"Гимназия №1504","gia":{"Физика":{"grade":4,"pupils":12},"Обществознание":{"grade":3.7,"pupils":59},"История":{"grade":5,"pupils":1},"Биология":{"grade":4,"pupils":5},"Химия":{"grade":4.8,"pupils":16},"Математика":{"grade":3.9,"pupils":157},"Английский":{"grade":4.1,"pupils":23},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.2,"pupils":21},"География":{"grade":4,"pupils":2},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.1,"pupils":157}},"year":2015,"report":"http://gym1504.mskobr.ru/files/publichnyj_doklad_gbou_gimnaziya_1504_za_2014-2015_uchebnyj_god.docx","coordinates":{"latitude":55.762044,"longitude":37.838019},"ege":{},"pupils":1980},{"universities":{"МГУПС":0.0425531914893617,"МГТУ имени Баумана":0.0851063829787234,"МГУ":0.19148936170212766,"НИУ ВШЭ":0.0425531914893617,"МАИ":0.0851063829787234},"name":"Лицей №1575","gia":{"Физика":{"grade":4,"pupils":13},"Обществознание":{"grade":4,"pupils":16},"Биология":{"grade":4.1,"pupils":7},"Химия":{"grade":4.4,"pupils":5},"Английский":{"grade":4.5,"pupils":42},"Математика":{"grade":4.3,"pupils":91},"Информатика":{"grade":4.6,"pupils":12},"Русский":{"grade":4.5,"pupils":91}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={508EC2E4-72B8-4DF9-918D-B0FAB25C4FE9}&name=1575_otchet-samoobsledovanie-2014-2015-(3).pdf","coordinates":{"latitude":55.804845,"longitude":37.532035},"ege":{"Физика":{"grade":60,"pupils":null},"Обществознание":{"grade":65,"pupils":null},"История":{"grade":54,"pupils":null},"Биология":{"grade":68,"pupils":null},"Химия":{"grade":67,"pupils":null},"Литература":{"grade":61,"pupils":null},"Английский":{"grade":74,"pupils":null},"Математика":{"grade":63,"pupils":null},"Информатика":{"grade":67,"pupils":null},"География":{"grade":81,"pupils":null},"Русский":{"grade":79,"pupils":null}},"pupils":1023},{"universities":{"МЭИ":0.06818181818181818,"Финансовый университет":0.045454545454545456,"МАДИ":0.045454545454545456,"МГУ":0.29545454545454547,"РУДН":0.045454545454545456},"name":"Школа №498","gia":{"Физика":{"grade":3.6,"pupils":29},"Обществознание":{"grade":3.8,"pupils":76},"Биология":{"grade":3.8,"pupils":6},"Английский":{"grade":4.1,"pupils":14},"Химия":{"grade":4.1,"pupils":7},"Математика":{"grade":3.7,"pupils":172},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4,"pupils":5},"Русский":{"grade":4.1,"pupils":172}},"year":2014,"report":"http://sch498.mskobr.ru/report/","coordinates":{"latitude":55.737613,"longitude":37.651987},"ege":{},"pupils":2680},{"universities":{"Финансовый университет":0.05172413793103448,"Первый МГМУ имени Сеченова":0.08620689655172414,"РНИМУ имени Пирогова":0.06896551724137931,"МГУ":0.29310344827586204,"АПИ при ИГиП РАН":0.05172413793103448},"name":"Школа №1468","gia":{"Физика":{"grade":3.8,"pupils":10},"Обществознание":{"grade":3.6,"pupils":36},"История":{"grade":3,"pupils":3},"Биология":{"grade":3.7,"pupils":33},"Английский":{"grade":3.9,"pupils":10},"Химия":{"grade":4.3,"pupils":29},"Математика":{"grade":3.4,"pupils":187},"Французский":{"grade":4,"pupils":8},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.5,"pupils":10},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":3.8,"pupils":178}},"year":2015,"report":"http://sch1468.mskobr.ru/files/2015-2016/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.742559,"longitude":37.680823},"ege":{"Физика":{"grade":59,"pupils":null},"Обществознание":{"grade":63,"pupils":null},"История":{"grade":63,"pupils":null},"Биология":{"grade":63,"pupils":null},"Литература":{"grade":67,"pupils":null},"Английский":{"grade":71,"pupils":null},"Математика":{"grade":58,"pupils":null},"Информатика":{"grade":51,"pupils":null},"Русский":{"grade":78,"pupils":null}},"pupils":2493},{"universities":{"МИГУП":0.021739130434782608,"АФСБ РФ":0.043478260869565216,"АПУ при ИГиП РАН":0.021739130434782608,"РАНХиГС при Президенте РФ":0.021739130434782608,"МГУ":0.45652173913043476},"name":"Школа №2009","gia":{"Физика":{"grade":3.5,"pupils":39},"Обществознание":{"grade":3.2,"pupils":59},"История":{"grade":2.6,"pupils":13},"Биология":{"grade":3.3,"pupils":27},"Химия":{"grade":3.7,"pupils":15},"Математика":{"grade":3.4,"pupils":226},"Английский":{"grade":4.6,"pupils":16},"Литература":{"grade":3.7,"pupils":6},"Информатика":{"grade":3.7,"pupils":39},"География":{"grade":4.5,"pupils":11},"Русский":{"grade":3.6,"pupils":226}},"year":2014,"report":"http://sch2009uz.mskobr.ru/files/model_samoanaliza.pdf","coordinates":{"latitude":55.540501,"longitude":37.519243},"ege":{"Физика":{"grade":46,"pupils":null},"Обществознание":{"grade":50,"pupils":null},"История":{"grade":38,"pupils":null},"Биология":{"grade":61,"pupils":null},"Химия":{"grade":61,"pupils":null},"Литература":{"grade":51,"pupils":null},"Английский":{"grade":54,"pupils":null},"Математика":{"grade":39,"pupils":null},"Информатика":{"grade":45,"pupils":null},"Русский":{"grade":59,"pupils":null}},"pupils":3180},{"universities":{"МИИТ":0.061224489795918366,"МГТУ имени Баумана":0.10204081632653061,"МАДИ":0.08163265306122448,"МГУ":0.20408163265306123,"МАИ":0.14285714285714285},"name":"Лицей №1550","gia":{"Физика":{"grade":3.8,"pupils":65},"Обществознание":{"grade":3.8,"pupils":6},"Биология":{"grade":3.7,"pupils":3},"Химия":{"grade":4.5,"pupils":11},"Английский":{"grade":4,"pupils":8},"Математика":{"grade":4,"pupils":98},"Информатика":{"grade":4.4,"pupils":28},"Русский":{"grade":4,"pupils":97}},"year":2015,"report":"http://lyc1550.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%D0%BB%D0%B8%D1%86%D0%B5%D1%8F%201550%20%D0%B7%D0%B0%20%202014-15.pdf","coordinates":{"latitude":55.782365,"longitude":37.55982},"ege":{},"pupils":2100},{"universities":{"Collège Universitaire Français de Moscou":0.05263157894736842,"Финансовый университет":0.05263157894736842,"РЭУ имени Плеханова":0.05263157894736842,"МГУ":0.21052631578947367,"РХТУ имени Менделеева":0.05263157894736842},"name":"Школа №1095","gia":{"Физика":{"grade":4.1,"pupils":16},"Обществознание":{"grade":3.7,"pupils":43},"История":{"grade":3,"pupils":2},"Биология":{"grade":3.8,"pupils":12},"Английский":{"grade":3.8,"pupils":18},"Химия":{"grade":3.7,"pupils":11},"Математика":{"grade":3.5,"pupils":139},"Французский":{"grade":3.8,"pupils":12},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.3,"pupils":12},"География":{"grade":4,"pupils":3},"Русский":{"grade":3.9,"pupils":138}},"year":2015,"report":"http://sch1095sv.mskobr.ru/files/%282%29.pdf","coordinates":{"latitude":55.872193,"longitude":37.670483},"ege":{},"pupils":2640},{"universities":{},"name":"Лицей №1367","gia":{"Физика":{"grade":3.7,"pupils":11},"Обществознание":{"grade":3.7,"pupils":23},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.4,"pupils":7},"Химия":{"grade":4,"pupils":6},"Математика":{"grade":3.8,"pupils":101},"Английский":{"grade":3.8,"pupils":8},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.5,"pupils":16},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":3.9,"pupils":101}},"year":2015,"report":"http://lyc1367uv.mskobr.ru/files/publichnyj_doklad_po_itogam_2014-2015_uchebnogo_goda.pdf","coordinates":{"latitude":55.714653,"longitude":37.752176},"ege":{},"pupils":2340},{"universities":{"Финансовый университет":0.037037037037037035,"МЭИ":0.037037037037037035,"МЭСИ":0.037037037037037035,"МГУ":0.4444444444444444,"МГЮА имени Кутафина":0.037037037037037035},"name":"Школа №630 ","gia":{"Физика":{"grade":3.4,"pupils":16},"Обществознание":{"grade":3.8,"pupils":18},"История":{"grade":3,"pupils":3},"Биология":{"grade":3.2,"pupils":22},"Химия":{"grade":4,"pupils":11},"Математика":{"grade":3.7,"pupils":182},"Английский":{"grade":4,"pupils":48},"Литература":{"grade":3,"pupils":3},"Информатика":{"grade":3.8,"pupils":80},"География":{"grade":3.4,"pupils":10},"Русский":{"grade":3.9,"pupils":182}},"year":2015,"report":"http://sch630.mskobr.ru/files/.%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.docx","coordinates":{"latitude":55.697184,"longitude":37.619378},"ege":{},"pupils":1660},{"universities":{},"name":"Школа №1794","gia":{"Физика":{"grade":3.4,"pupils":8},"Обществознание":{"grade":3.8,"pupils":13},"Биология":{"grade":3.6,"pupils":5},"Химия":{"grade":3.8,"pupils":4},"Математика":{"grade":3.5,"pupils":219},"Английский":{"grade":4.1,"pupils":7},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4,"pupils":2},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":3.5,"pupils":4},"Русский":{"grade":4,"pupils":219}},"year":2015,"report":"http://sch1794s.mskobr.ru/report/","coordinates":{"latitude":55.872481,"longitude":37.566359},"ege":{},"pupils":2460},{"universities":{"Финансовый университет":0.043478260869565216,"АГПС":0.043478260869565216,"РЭУ имени Плеханова":0.043478260869565216,"МГУ":0.32608695652173914,"МАИ":0.06521739130434782},"name":"Школа №1315","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":3.8,"pupils":11},"История":{"grade":4,"pupils":5},"Биология":{"grade":5,"pupils":1},"Химия":{"grade":4.5,"pupils":8},"Математика":{"grade":3.8,"pupils":138},"Английский":{"grade":4.5,"pupils":36},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4,"pupils":8},"Русский":{"grade":4.2,"pupils":137}},"year":2015,"report":"http://sch1315s.mskobr.ru/files/doklad_1315.pdf","coordinates":{"latitude":55.845895,"longitude":37.481145},"ege":{},"pupils":1400},{"universities":{"МГСУ НИУ":0.08333333333333333,"Первый МГМУ имени Сеченова":0.05555555555555555,"МГУ":0.2777777777777778,"МФЮА":0.05555555555555555,"МГТУ Станкин":0.027777777777777776},"name":"Школа №1363","gia":{"Физика":{"grade":3.5,"pupils":6},"Обществознание":{"grade":4.1,"pupils":41},"История":{"grade":5,"pupils":1},"Биология":{"grade":3.4,"pupils":8},"Химия":{"grade":4.8,"pupils":5},"Математика":{"grade":3.4,"pupils":83},"Английский":{"grade":4.9,"pupils":17},"Литература":{"grade":4.3,"pupils":4},"Информатика":{"grade":4.5,"pupils":13},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":3.8,"pupils":83}},"year":2015,"report":"http://sch1363uv.mskobr.ru/files/documents/2015-2016/%D0%A1%D0%90%D0%9C%D0%9E%D0%9E%D0%91%D0%A1%D0%9B%D0%95%D0%94%D0%9E%D0%92%D0%90%D0%9D%D0%98%D0%95.pdf","coordinates":{"latitude":55.707588,"longitude":37.823745},"ege":{"Математика":{"grade":55,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":3491},{"universities":{"МАТИ Циолковского":0.02702702702702703,"МГСУ НИУ":0.05405405405405406,"НИЯУ МИФИ":0.05405405405405406,"МГУ":0.2702702702702703,"МГЮА имени Кутафина":0.05405405405405406},"name":"Гимназия №1636 ","gia":{"Физика":{"grade":3.6,"pupils":25},"Обществознание":{"grade":3.8,"pupils":49},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.2,"pupils":13},"Химия":{"grade":4.2,"pupils":23},"Английский":{"grade":4,"pupils":31},"Математика":{"grade":3.6,"pupils":155},"Информатика":{"grade":4.3,"pupils":25},"География":{"grade":3.7,"pupils":7},"Русский":{"grade":4.1,"pupils":155}},"year":2014,"report":"http://gym1636u.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%94%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%202013-2014%281%29.pdf","coordinates":{"latitude":55.607997,"longitude":37.732018},"ege":{},"pupils":2060},{"universities":{},"name":"Школа №2097","gia":{"Физика":{"grade":3.8,"pupils":10},"Обществознание":{"grade":4,"pupils":41},"История":{"grade":3.8,"pupils":4},"Биология":{"grade":4,"pupils":20},"Химия":{"grade":4,"pupils":15},"Математика":{"grade":3.8,"pupils":231},"Английский":{"grade":4.6,"pupils":29},"Литература":{"grade":4.3,"pupils":4},"Информатика":{"grade":4.6,"pupils":33},"География":{"grade":3.8,"pupils":4},"Русский":{"grade":4,"pupils":231}},"year":2014,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={8709E55F-4DDA-41B7-92CF-491F30B1B37E}&name=%D0%A1amoobsledovanie-%D0%93%D0%91%D0%9E%D0%A3-%D0%A8kola-%E2%84%96-2097.pdf","coordinates":{"latitude":55.84674,"longitude":37.430139},"ege":{"Физика":{"grade":55,"pupils":23},"Обществознание":{"grade":59,"pupils":111},"История":{"grade":48,"pupils":23},"Биология":{"grade":58,"pupils":21},"Химия":{"grade":71,"pupils":16},"Литература":{"grade":57,"pupils":7},"Английский":{"grade":61,"pupils":36},"Математика":{"grade":49,"pupils":158},"Информатика":{"grade":60,"pupils":19},"География":{"grade":76,"pupils":3},"Русский":{"grade":69,"pupils":158}},"pupils":3009},{"universities":{"МАрхИ":0.041666666666666664,"МФТИ":0.05555555555555555,"РЭУ имени Плеханова":0.027777777777777776,"МГУ":0.4305555555555556,"НИУ ВШЭ":0.08333333333333333},"name":"Школа №218","gia":{"Физика":{"grade":4,"pupils":23},"Обществознание":{"grade":4.3,"pupils":8},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":4.2,"pupils":6},"Химия":{"grade":4.9,"pupils":11},"Математика":{"grade":4.7,"pupils":78},"Английский":{"grade":4.6,"pupils":28},"Литература":{"grade":4.3,"pupils":3},"Информатика":{"grade":5,"pupils":3},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.6,"pupils":78}},"year":2015,"report":"http://sch218.mskobr.ru/files/publ_otchet_201415.pdf","coordinates":{"latitude":55.812003,"longitude":37.575298},"ege":{"Физика":{"grade":73,"pupils":null},"Обществознание":{"grade":74,"pupils":null},"История":{"grade":71,"pupils":null},"Биология":{"grade":77,"pupils":null},"Химия":{"grade":80,"pupils":null},"Литература":{"grade":74,"pupils":null},"Английский":{"grade":81,"pupils":null},"Математика":{"grade":69,"pupils":null},"Информатика":{"grade":73,"pupils":null},"География":{"grade":62,"pupils":null},"Русский":{"grade":85,"pupils":null}},"pupils":903},{"universities":{"МГППУ":0.037037037037037035,"Первый МГМУ имени Сеченова":0.037037037037037035,"МГУ":0.3333333333333333,"РГАУ-МСХА имени Тимирязева":0.037037037037037035,"МАИ":0.1111111111111111},"name":"Центр образования №1601 имени Лютикова","gia":{"Физика":{"grade":3.9,"pupils":18},"Обществознание":{"grade":3.6,"pupils":27},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":4,"pupils":7},"Химия":{"grade":4.3,"pupils":11},"Математика":{"grade":3.6,"pupils":160},"Английский":{"grade":4,"pupils":27},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.3,"pupils":15},"География":{"grade":4,"pupils":3},"Русский":{"grade":3.9,"pupils":161}},"year":2015,"report":"http://cos1601.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%93%D0%91%D0%9E%D0%A3%20%D0%A6%D0%9E%20%E2%84%96%201601%20%D0%B8%D0%BC.%20%D0%93%D0%B5%D1%80%D0%BE%D1%8F%20%D0%A1%D0%BE%D0%B2%D0%B5%D1%82%D1%81%D0%BA%D0%BE%D0%B3%D0%BE%20%D0%A1%D0%BE%D1%8E%D0%B7%D0%B0%20%D0%95.%D0%9A.%20%D0%9B%D1%8E%D1%82%D0%B8%D0%BA%D0%BE%D0%B2%D0%B0.pdf","coordinates":{"latitude":55.792336,"longitude":37.573483},"ege":{},"pupils":2340},{"universities":{"МОИУП":0.04081632653061224,"Финансовый университет":0.061224489795918366,"МГУ":0.30612244897959184,"ГУМФ":0.061224489795918366,"МГИМО":0.04081632653061224},"name":"Школа №1231 имени Поленова","gia":{"Физика":{"grade":4,"pupils":5},"Обществознание":{"grade":3.9,"pupils":63},"История":{"grade":3.6,"pupils":7},"Биология":{"grade":4.1,"pupils":17},"Английский":{"grade":3.8,"pupils":32},"Химия":{"grade":4.3,"pupils":15},"Математика":{"grade":3.8,"pupils":156},"Французский":{"grade":3.8,"pupils":61},"Литература":{"grade":3.3,"pupils":4},"Информатика":{"grade":4.2,"pupils":15},"География":{"grade":4,"pupils":6},"Немецкий":{"grade":3.2,"pupils":25},"Русский":{"grade":4.2,"pupils":155}},"year":2014,"report":"http://sch1231.mskobr.ru/files/za_otchetnyj_period_2012-15.pdf","coordinates":{"latitude":55.749653,"longitude":37.589033},"ege":{"Французский":{"grade":81,"pupils":null},"Английский":{"grade":74,"pupils":null},"Русский":{"grade":73,"pupils":null},"Литература":{"grade":73,"pupils":null}},"pupils":3342},{"universities":{},"name":"Школа №1450 ","gia":{"Физика":{"grade":3.8,"pupils":8},"Обществознание":{"grade":3.8,"pupils":33},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":4,"pupils":9},"Химия":{"grade":3.3,"pupils":4},"Английский":{"grade":4.4,"pupils":37},"Математика":{"grade":3.6,"pupils":188},"Информатика":{"grade":3.8,"pupils":22},"География":{"grade":3.5,"pupils":2},"Русский":{"grade":4,"pupils":192}},"year":2015,"report":"http://sch1450u.mskobr.ru/files/%20%D0%94%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%2014-15.pdf","coordinates":{"latitude":55.658449,"longitude":37.612182},"ege":{},"pupils":2380},{"universities":{"Финансовый университет":0.04,"РНИМУ имени Пирогова":0.04,"МГУ":0.2,"ГУУ":0.04,"МГППУ":0.04},"name":"Школа №1248","gia":{"Физика":{"grade":3.6,"pupils":7},"Обществознание":{"grade":3.6,"pupils":41},"История":{"grade":4,"pupils":3},"Биология":{"grade":4,"pupils":2},"Английский":{"grade":4.6,"pupils":9},"Химия":{"grade":3.9,"pupils":8},"Математика":{"grade":3.7,"pupils":109},"Французский":{"grade":3.7,"pupils":42},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.4,"pupils":12},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.1,"pupils":109}},"year":2015,"report":"http://sch1248.mskobr.ru/files/Documenti/%D0%BF%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.pdf","coordinates":{"latitude":55.725554,"longitude":37.473698},"ege":{},"pupils":1260},{"universities":{"МГТУГА":0.05194805194805195,"Финансовый университет":0.025974025974025976,"МАДИ":0.06493506493506493,"МГУ":0.3116883116883117,"МАИ":0.06493506493506493},"name":"Школа №152","gia":{"Физика":{"grade":4.2,"pupils":5},"Обществознание":{"grade":3.7,"pupils":6},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4.7,"pupils":3},"Химия":{"grade":4.6,"pupils":7},"Математика":{"grade":3.7,"pupils":138},"Английский":{"grade":4.5,"pupils":24},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.3,"pupils":4},"География":{"grade":4.1,"pupils":7},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":4.1,"pupils":138}},"year":2015,"report":"http://sch152s-new.mskobr.ru/files/_2015.pdf","coordinates":{"latitude":55.800661,"longitude":37.535134},"ege":{},"pupils":3820},{"universities":{"МПГУ":0.028985507246376812,"Финансовый университет":0.043478260869565216,"РАНХиГС при Президенте РФ":0.043478260869565216,"МГУ":0.42028985507246375,"Школа-студия МХАТ":0.028985507246376812},"name":"Школа №117","gia":{"Физика":{"grade":3.8,"pupils":11},"Обществознание":{"grade":3.9,"pupils":47},"История":{"grade":4.3,"pupils":3},"Биология":{"grade":3.9,"pupils":8},"Английский":{"grade":4.4,"pupils":128},"Химия":{"grade":4.6,"pupils":10},"Математика":{"grade":4.1,"pupils":196},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":4.4,"pupils":9},"География":{"grade":4.8,"pupils":5},"Русский":{"grade":4.4,"pupils":196}},"year":2014,"report":"http://sch117.mskobr.ru/files/UploadFiles/otchet_2013.pdf","coordinates":{"latitude":55.669194,"longitude":37.534101},"ege":{},"pupils":1080},{"universities":{},"name":"Образовательный центр на проспекте Вернадского","gia":{"Физика":{"grade":4,"pupils":17},"Обществознание":{"grade":3.9,"pupils":38},"История":{"grade":3,"pupils":3},"Биология":{"grade":4,"pupils":20},"Химия":{"grade":4,"pupils":22},"Математика":{"grade":4.3,"pupils":86},"Английский":{"grade":4.3,"pupils":72},"Литература":{"grade":4.5,"pupils":8},"Информатика":{"grade":4.9,"pupils":19},"География":{"grade":4.1,"pupils":22},"Русский":{"grade":4.4,"pupils":86}},"year":2015,"report":"https://yadi.sk/i/o7hkoswmhY76y","coordinates":{"latitude":55.653101,"longitude":37.483616},"ege":{},"pupils":1000},{"universities":{"Финансовый университет":0.03225806451612903,"РЭУ имени Плеханова":0.0967741935483871,"АУ МВД РФ":0.03225806451612903,"МГУ":0.5161290322580645,"МГК имени Чайковского":0.03225806451612903},"name":"Гимназия №1569 ","gia":{"Физика":{"grade":3.9,"pupils":9},"Обществознание":{"grade":4,"pupils":46},"Биология":{"grade":3.8,"pupils":12},"Химия":{"grade":4.5,"pupils":8},"Математика":{"grade":3.7,"pupils":178},"Английский":{"grade":4.3,"pupils":44},"Литература":{"grade":4,"pupils":4},"Информатика":{"grade":3.4,"pupils":5},"Русский":{"grade":4,"pupils":179}},"year":2015,"report":"http://gym1569u.mskobr.ru/files/doklad.pdf","coordinates":{"latitude":55.617154,"longitude":37.738818},"ege":{"Математика":{"grade":51,"pupils":null},"Русский":{"grade":75,"pupils":null}},"pupils":2473},{"universities":{"Финансовый университет":0.02564102564102564,"МФТИ":0.23076923076923078,"РЭУ имени Плеханова":0.02564102564102564,"МГУ":0.2564102564102564,"ГУЗ":0.02564102564102564},"name":"Курчатовская школа","gia":{"Физика":{"grade":3.8,"pupils":27},"Обществознание":{"grade":3.4,"pupils":49},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.5,"pupils":40},"Химия":{"grade":3.9,"pupils":27},"Математика":{"grade":3.7,"pupils":196},"Английский":{"grade":4.3,"pupils":23},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.2,"pupils":52},"География":{"grade":3.8,"pupils":5},"Русский":{"grade":4,"pupils":191}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={F3AFCEF1-38F0-405A-BBBF-E068753E0090}&name=kurchat_samoobsledovanie_2014-2015.pdf","coordinates":{"latitude":55.797194,"longitude":37.488395},"ege":{"Физика":{"grade":71,"pupils":null},"Обществознание":{"grade":54,"pupils":null},"История":{"grade":52,"pupils":null},"Биология":{"grade":69,"pupils":null},"Химия":{"grade":69,"pupils":null},"Литература":{"grade":54,"pupils":null},"Английский":{"grade":66,"pupils":null},"Математика":{"grade":58,"pupils":null},"Информатика":{"grade":69,"pupils":null},"География":{"grade":54,"pupils":null},"Немецкий":{"grade":98,"pupils":null},"Русский":{"grade":74,"pupils":null}},"pupils":2448},{"universities":{"РНИМУ имени Пирогова":0.020833333333333332,"Финансовый университет":0.041666666666666664,"Первый МГМУ имени Сеченова":0.08333333333333333,"РАНХиГС при Президенте РФ":0.03125,"МГУ":0.5},"name":"Гимназия №1539","gia":{"Физика":{"grade":3.2,"pupils":6},"Обществознание":{"grade":3.7,"pupils":42},"Биология":{"grade":4.2,"pupils":9},"Химия":{"grade":5,"pupils":3},"Математика":{"grade":3.5,"pupils":128},"Английский":{"grade":4.2,"pupils":38},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.8,"pupils":4},"География":{"grade":3.7,"pupils":6},"Русский":{"grade":4,"pupils":128}},"year":2015,"report":"http://gym1539sv.mskobr.ru/files/.%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%202014-2015%2B.docx","coordinates":{"latitude":55.810324,"longitude":37.641836},"ege":{},"pupils":2020},{"universities":{"ВАВТ":0.045454545454545456,"Финансовый университет":0.06818181818181818,"МГУ":0.20454545454545456,"НИУ ВШЭ":0.11363636363636363,"МГИМО":0.06818181818181818},"name":"Школа №1251 имени Шарля де Голля","gia":{"Физика":{"grade":3.4,"pupils":8},"Обществознание":{"grade":3.4,"pupils":42},"История":{"grade":4.5,"pupils":2},"Биология":{"grade":3.8,"pupils":15},"Английский":{"grade":3.8,"pupils":19},"Химия":{"grade":5,"pupils":3},"Математика":{"grade":3.5,"pupils":131},"Французский":{"grade":4.4,"pupils":36},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.4,"pupils":7},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":4.1,"pupils":132}},"year":2015,"report":"http://sch1251s.mskobr.ru/files/%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D1%8B/%D0%9F%D0%A3%D0%91%D0%9B.%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94.2014-15%D0%92%D0%95%D0%A1%D0%AC.1..pdf","coordinates":{"latitude":55.794143,"longitude":37.506783},"ege":{"Физика":{"grade":66,"pupils":null},"Обществознание":{"grade":58,"pupils":null},"История":{"grade":67,"pupils":null},"Биология":{"grade":47,"pupils":null},"Английский":{"grade":77,"pupils":null},"Химия":{"grade":72,"pupils":null},"Литература":{"grade":61,"pupils":null},"Французский":{"grade":84,"pupils":null},"Математика":{"grade":54,"pupils":null},"Информатика":{"grade":58,"pupils":null},"География":{"grade":78,"pupils":null},"Русский":{"grade":75,"pupils":null}},"pupils":969},{"universities":{"МГГУ имени Шолохова":0.03225806451612903,"БВШД":0.03225806451612903,"Финансовый университет":0.03225806451612903,"РНИМУ имени Пирогова":0.03225806451612903,"МГУ":0.41935483870967744},"name":"Школа №1285","gia":{"Физика":{"grade":3.9,"pupils":8},"Обществознание":{"grade":3.9,"pupils":61},"История":{"grade":4,"pupils":1},"Биология":{"grade":3.7,"pupils":15},"Химия":{"grade":4,"pupils":5},"Математика":{"grade":3.6,"pupils":138},"Английский":{"grade":4.2,"pupils":57},"Литература":{"grade":3.6,"pupils":5},"Информатика":{"grade":4,"pupils":9},"География":{"grade":4.5,"pupils":2},"Русский":{"grade":4,"pupils":137}},"year":2015,"report":"http://sch1285sz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%B4%D0%B8%D1%80%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B0%20%D0%B7%D0%B0%202014-2015%20%D1%83%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9%20%D0%B3%D0%BE%D0%B4(1).pdf","coordinates":{"latitude":55.833814,"longitude":37.448662},"ege":{},"pupils":1700},{"universities":{"Финансовый университет":0.058823529411764705,"МАТИ Циолковского":0.029411764705882353,"МГУПИ":0.14705882352941177,"МГУ":0.4117647058823529,"ГУУ":0.058823529411764705},"name":"Лицей №1598","gia":{"Физика":{"grade":3.6,"pupils":8},"Обществознание":{"grade":3.6,"pupils":14},"История":{"grade":2.5,"pupils":2},"Биология":{"grade":3.2,"pupils":5},"Химия":{"grade":3.6,"pupils":8},"Математика":{"grade":3.3,"pupils":93},"Английский":{"grade":4.5,"pupils":8},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":3.7,"pupils":7},"География":{"grade":3,"pupils":1},"Русский":{"grade":3.9,"pupils":93}},"year":2015,"report":"http://lyc1598v.mskobr.ru/report/","coordinates":{"latitude":55.824668,"longitude":37.82953},"ege":{},"pupils":2800},{"universities":{"МГИМО":0.05714285714285714,"Первый МГМУ имени Сеченова":0.05714285714285714,"РЭУ имени Плеханова":0.04285714285714286,"МГУ":0.32857142857142857,"РУДН":0.05714285714285714},"name":"Школа №1253","gia":{"Физика":{"grade":3.4,"pupils":5},"Обществознание":{"grade":4,"pupils":47},"История":{"grade":4,"pupils":3},"Биология":{"grade":4.4,"pupils":50},"Английский":{"grade":4.5,"pupils":76},"Химия":{"grade":4.8,"pupils":51},"Математика":{"grade":4.2,"pupils":161},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.8,"pupils":5},"Русский":{"grade":4.3,"pupils":161}},"year":2013,"report":"http://sch1253c.mskobr.ru/files/otchet-o-deyatelynosti-za-2012--2013-god.pdf","coordinates":{"latitude":55.734471,"longitude":37.592096},"ege":{"Физика":{"grade":61,"pupils":8},"Обществознание":{"grade":72,"pupils":37},"История":{"grade":71,"pupils":10},"Биология":{"grade":86,"pupils":97},"Химия":{"grade":89,"pupils":97},"Литература":{"grade":77,"pupils":6},"Английский":{"grade":91,"pupils":50},"Математика":{"grade":61,"pupils":143},"Русский":{"grade":82,"pupils":143}},"pupils":1345},{"universities":{"РГГУ":0.04878048780487805,"Финансовый университет":0.04878048780487805,"МГУ":0.36585365853658536,"АГПС МЧС России":0.04878048780487805,"АМИ":0.04878048780487805},"name":"Гимназия №1540","gia":{"Физика":{"grade":3.7,"pupils":3},"Обществознание":{"grade":3.7,"pupils":13},"История":{"grade":5,"pupils":1},"Биология":{"grade":4.2,"pupils":5},"Химия":{"grade":4,"pupils":6},"Английский":{"grade":4.1,"pupils":28},"Математика":{"grade":3.7,"pupils":82},"Информатика":{"grade":4.2,"pupils":23},"Русский":{"grade":4,"pupils":83}},"year":2014,"report":"http://gymc1540.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.786961,"longitude":37.591701},"ege":{},"pupils":1680},{"universities":{},"name":"Школа №2129","gia":{"Физика":{"grade":3.3,"pupils":6},"Обществознание":{"grade":4,"pupils":29},"История":{"grade":4,"pupils":2},"Биология":{"grade":3.9,"pupils":12},"Химия":{"grade":4.4,"pupils":9},"Математика":{"grade":3.7,"pupils":78},"Английский":{"grade":4.1,"pupils":9},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4.3,"pupils":6},"География":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":78}},"year":2014,"report":"http://sch2129uv.mskobr.ru/report/","coordinates":{"latitude":55.700207,"longitude":37.682862},"ege":{},"pupils":2200},{"universities":{},"name":"Гимназия №2200","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":3.9,"pupils":7},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":5,"pupils":4},"Химия":{"grade":5,"pupils":3},"Математика":{"grade":4.2,"pupils":73},"Английский":{"grade":4.5,"pupils":52},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":4,"pupils":2},"Русский":{"grade":4.3,"pupils":73}},"year":2015,"report":"http://gymnasium2200.mskobr.ru/files/publichniy_doklad/%D0%9F%D0%A3%D0%91%D0%9B%D0%98%D0%A7%D0%9D%D0%AB%D0%99%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%202014-2015%20%D0%BE%D1%82%2030%20%D0%B8%D1%8E%D0%BD%D1%8F%202015%20%D0%B3....pdf","coordinates":{"latitude":55.807294,"longitude":37.806299},"ege":{},"pupils":1660},{"universities":{"МГТУ Станкин":0.05333333333333334,"Финансовый университет":0.04,"МАИ":0.05333333333333334,"МГУ":0.18666666666666668,"МГТУ имени Баумана":0.16},"name":"Многопрофильный лицей №1501","gia":{"Физика":{"grade":4,"pupils":78},"Обществознание":{"grade":3.7,"pupils":61},"История":{"grade":4,"pupils":3},"Биология":{"grade":4,"pupils":75},"Английский":{"grade":4.1,"pupils":22},"Химия":{"grade":4.3,"pupils":83},"Французский":{"grade":4.1,"pupils":17},"Математика":{"grade":4.1,"pupils":331},"Информатика":{"grade":4.4,"pupils":30},"География":{"grade":4,"pupils":10},"Немецкий":{"grade":4.3,"pupils":27},"Русский":{"grade":4.2,"pupils":332}},"year":2015,"report":"http://lycc1501.mskobr.ru/files/public_report_2014_2015.pdf","coordinates":{"latitude":55.787705,"longitude":37.595761},"ege":{"Физика":{"grade":62,"pupils":80},"Обществознание":{"grade":62,"pupils":96},"История":{"grade":56,"pupils":34},"Биология":{"grade":72,"pupils":125},"Английский":{"grade":74,"pupils":45},"Химия":{"grade":72,"pupils":115},"Литература":{"grade":64,"pupils":14},"Французский":{"grade":78,"pupils":19},"Математика":{"grade":59,"pupils":219},"Информатика":{"grade":64,"pupils":38},"География":{"grade":76,"pupils":2},"Немецкий":{"grade":74,"pupils":20},"Русский":{"grade":77,"pupils":331}},"pupils":3356},{"universities":{"РГГУ":0.03278688524590164,"Первый МГМУ имени Сеченова":0.04918032786885246,"МГУ":0.36065573770491804,"РУДН":0.04918032786885246,"ГУУ":0.03278688524590164},"name":"Школа №199","gia":{"Физика":{"grade":3.8,"pupils":30},"Обществознание":{"grade":3.7,"pupils":13},"История":{"grade":3.5,"pupils":24},"Биология":{"grade":3.8,"pupils":21},"Химия":{"grade":4.3,"pupils":20},"Английский":{"grade":3.9,"pupils":37},"Математика":{"grade":4,"pupils":119},"Информатика":{"grade":4.5,"pupils":34},"Русский":{"grade":4.3,"pupils":116}},"year":2015,"report":"http://sch199uz.mskobr.ru/files/%20%E2%84%96%20199%202014-15%20%20(1).pdf","coordinates":{"latitude":55.69008,"longitude":37.571579},"ege":{},"pupils":2257},{"universities":{"МГУПИ":0.09090909090909091,"Финансовый университет":0.12121212121212122,"МГУ":0.12121212121212122,"НИУ ВШЭ":0.09090909090909091,"МГППУ":0.06060606060606061},"name":"Школа №1282","gia":{"Физика":{"grade":4,"pupils":2},"Обществознание":{"grade":4.3,"pupils":7},"Биология":{"grade":5,"pupils":2},"Химия":{"grade":3.5,"pupils":2},"Английский":{"grade":4.7,"pupils":14},"Математика":{"grade":3.5,"pupils":55},"Информатика":{"grade":4.3,"pupils":8},"География":{"grade":5,"pupils":1},"Русский":{"grade":3.9,"pupils":55}},"year":2015,"report":"http://schvu1282.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%201282%202014-2015.pdf","coordinates":{"latitude":55.789775,"longitude":37.684766},"ege":{},"pupils":1880},{"universities":{"Первый МГМУ имени Сеченова":0.2222222222222222,"РАНХиГС при Президенте РФ":0.031746031746031744,"МГУ":0.23809523809523808,"НИУ ВШЭ":0.06349206349206349,"МГТУ имени Баумана":0.07936507936507936},"name":"Школа №315","gia":{"Физика":{"grade":4,"pupils":24},"Обществознание":{"grade":3.9,"pupils":11},"История":{"grade":4,"pupils":1},"Биология":{"grade":4.3,"pupils":4},"Химия":{"grade":4.3,"pupils":4},"Математика":{"grade":4.5,"pupils":53},"Английский":{"grade":4.2,"pupils":6},"Литература":{"grade":3.6,"pupils":5},"Информатика":{"grade":4.5,"pupils":33},"География":{"grade":4.7,"pupils":3},"Русский":{"grade":4.5,"pupils":53}},"year":2015,"report":"http://schc315.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D1%91%D1%82%202015.pdf","coordinates":{"latitude":55.782466,"longitude":37.674705},"ege":{},"pupils":1520},{"universities":{"НИТУ МИСиС":0.029411764705882353,"Первый МГМУ имени Сеченова":0.029411764705882353,"РАНХиГС при Президенте РФ":0.058823529411764705,"МГУ":0.38235294117647056,"НИУ ВШЭ":0.058823529411764705},"name":"Школа №1359 имени Миля","gia":{"Физика":{"grade":3.8,"pupils":6},"Обществознание":{"grade":4.2,"pupils":28},"История":{"grade":3.3,"pupils":4},"Биология":{"grade":4,"pupils":12},"Химия":{"grade":4.4,"pupils":12},"Математика":{"grade":3.8,"pupils":77},"Английский":{"grade":4.8,"pupils":43},"Литература":{"grade":4,"pupils":1},"Информатика":{"grade":3.9,"pupils":17},"География":{"grade":3.5,"pupils":2},"Немецкий":{"grade":4.5,"pupils":2},"Русский":{"grade":4.1,"pupils":77}},"year":2015,"report":"http://sch1359uv.mskobr.ru/files/attach_files/1359yuvao1359.pdf","coordinates":{"latitude":55.701501,"longitude":37.84534},"ege":{"Физика":{"grade":54,"pupils":4},"Обществознание":{"grade":70,"pupils":32},"История":{"grade":61,"pupils":14},"Биология":{"grade":72,"pupils":6},"Химия":{"grade":65,"pupils":5},"Литература":{"grade":63,"pupils":5},"Английский":{"grade":82,"pupils":38},"Математика":{"grade":53,"pupils":35},"Русский":{"grade":82,"pupils":43}},"pupils":785},{"universities":{"Финансовый университет":0.06451612903225806,"Первый МГМУ имени Сеченова":0.06451612903225806,"МГУ":0.4838709677419355,"НИУ ВШЭ":0.03225806451612903,"МГК имени Чайковского":0.03225806451612903},"name":"Школа №1222 имени Маршала Баграмяна","gia":{"Физика":{"grade":3.2,"pupils":10},"Обществознание":{"grade":4,"pupils":38},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":3.3,"pupils":7},"Химия":{"grade":3.6,"pupils":8},"Английский":{"grade":3,"pupils":4},"Математика":{"grade":3,"pupils":68},"Информатика":{"grade":4.7,"pupils":6},"География":{"grade":3.3,"pupils":9},"Немецкий":{"grade":3.6,"pupils":19},"Русский":{"grade":3.5,"pupils":70}},"year":2015,"report":"http://sch1222uv.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015%20%D1%80%D0%B5%D0%B4%20%D0%BE%D1%82%2009072015.pdf","coordinates":{"latitude":55.732813,"longitude":37.706371},"ege":{},"pupils":2220},{"universities":{"МПГУ":0.058823529411764705,"АГЗ МЧС России":0.058823529411764705,"МГУ":0.5,"РУДН":0.029411764705882353,"РГГУ":0.058823529411764705},"name":"Школа №1355","gia":{"Физика":{"grade":3.8,"pupils":12},"Обществознание":{"grade":3.8,"pupils":16},"История":{"grade":3.6,"pupils":5},"Биология":{"grade":4,"pupils":5},"Химия":{"grade":4.7,"pupils":7},"Математика":{"grade":3.8,"pupils":84},"Английский":{"grade":3.9,"pupils":8},"Литература":{"grade":3.5,"pupils":2},"Информатика":{"grade":4.2,"pupils":31},"География":{"grade":4.1,"pupils":7},"Русский":{"grade":4,"pupils":85}},"year":2015,"report":"http://sch1355uz.mskobr.ru/files/%20%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202014-2015%20%D0%93%D0%91%D0%9E%D0%A3%20%D0%A8%D0%BA%D0%BE%D0%BB%D0%B0%20%E2%84%961355%281%29.pdf","coordinates":{"latitude":55.540531,"longitude":37.577822},"ege":{},"pupils":1280},{"universities":{"РГУНГ имени Губкина":0.029850746268656716,"Финансовый университет":0.04477611940298507,"МАИ":0.05970149253731343,"МГУ":0.3283582089552239,"МГТУ имени Баумана":0.07462686567164178},"name":"Школа №962","gia":{"Физика":{"grade":3.9,"pupils":14},"Обществознание":{"grade":4.3,"pupils":25},"История":{"grade":4,"pupils":2},"Биология":{"grade":4.3,"pupils":7},"Химия":{"grade":4.5,"pupils":12},"Математика":{"grade":4,"pupils":119},"Английский":{"grade":4.3,"pupils":8},"Литература":{"grade":3,"pupils":2},"Информатика":{"grade":5,"pupils":4},"География":{"grade":5,"pupils":2},"Русский":{"grade":4.2,"pupils":119}},"year":2015,"report":"http://sch962sv.mskobr.ru/files/dokumenty/otchet_za_2014-15_uchebnyj_god_5_08_2015.pdf","coordinates":{"latitude":55.859494,"longitude":37.592923},"ege":{"Физика":{"grade":67,"pupils":20},"Обществознание":{"grade":64,"pupils":53},"История":{"grade":62,"pupils":10},"Биология":{"grade":64,"pupils":9},"Химия":{"grade":59,"pupils":6},"Литература":{"grade":53,"pupils":4},"Английский":{"grade":80,"pupils":24},"Математика":{"grade":56,"pupils":76},"Информатика":{"grade":39,"pupils":10},"География":{"grade":100,"pupils":1},"Русский":{"grade":75,"pupils":83}},"pupils":2220},{"universities":{"Финансовый университет":0.0625,"РНИМУ имени Пирогова":0.03125,"МГУ":0.5625,"РЭУ имени Плеханова":0.03125,"ГЭИ":0.03125},"name":"Школа №2033","gia":{"Физика":{"grade":3.8,"pupils":4},"Обществознание":{"grade":4.2,"pupils":13},"Биология":{"grade":4,"pupils":8},"Химия":{"grade":4.2,"pupils":12},"Английский":{"grade":4.3,"pupils":9},"Математика":{"grade":3.7,"pupils":72},"Информатика":{"grade":4.3,"pupils":3},"Русский":{"grade":4.1,"pupils":72}},"year":2015,"report":"http://sch2033v.mskobr.ru/files/publichnyj_doklad1415.doc","coordinates":{"latitude":55.808093,"longitude":37.779628},"ege":{},"pupils":1040},{"universities":{"МГИУ":0.02564102564102564,"МЭИ":0.02564102564102564,"Финансовый университет":0.1282051282051282,"МГУ":0.48717948717948717,"МГТУ имени Баумана":0.05128205128205128},"name":"Школа №192","gia":{"Физика":{"grade":4,"pupils":40},"Обществознание":{"grade":3.4,"pupils":9},"История":{"grade":3.3,"pupils":4},"Биология":{"grade":4.3,"pupils":29},"Химия":{"grade":4.4,"pupils":45},"Английский":{"grade":4.5,"pupils":31},"Математика":{"grade":4,"pupils":182},"Информатика":{"grade":4.6,"pupils":25},"География":{"grade":4.4,"pupils":8},"Русский":{"grade":4.1,"pupils":180}},"year":2015,"report":"http://sch192uz.mskobr.ru/files/m-publ2014-2015-2.ppt","coordinates":{"latitude":55.706741,"longitude":37.57484},"ege":{"Физика":{"grade":67,"pupils":36},"Обществознание":{"grade":58,"pupils":56},"История":{"grade":46,"pupils":30},"Биология":{"grade":73,"pupils":38},"Химия":{"grade":72,"pupils":35},"Литература":{"grade":56,"pupils":12},"Английский":{"grade":68,"pupils":39},"Математика":{"grade":60,"pupils":109},"Информатика":{"grade":69,"pupils":15},"География":{"grade":60,"pupils":null},"Русский":{"grade":74,"pupils":140}},"pupils":1805},{"universities":{"Финансовый университет":0.013468013468013467,"МФТИ":0.016835016835016835,"МАИ":0.013468013468013467,"МГУ":0.26262626262626265,"МГТУ имени Баумана":0.494949494949495},"name":"Лицей №1580 при МГТУ имена Баумана","gia":{"Физика":{"grade":4.1,"pupils":217},"Обществознание":{"grade":4,"pupils":11},"Биология":{"grade":4.2,"pupils":6},"Химия":{"grade":4.2,"pupils":5},"Английский":{"grade":4.6,"pupils":58},"Математика":{"grade":4.9,"pupils":220},"Информатика":{"grade":4.8,"pupils":60},"География":{"grade":5,"pupils":1},"Русский":{"grade":4.4,"pupils":219}},"year":2015,"report":"http://lycu1580.mskobr.ru/files/publichnyj_doklad_direktora_gbou_liceya_1580_28_08_15.pdf","coordinates":{"latitude":55.641524,"longitude":37.613018},"ege":{"Физика":{"grade":77,"pupils":348},"Обществознание":{"grade":69,"pupils":25},"История":{"grade":77,"pupils":4},"Биология":{"grade":66,"pupils":8},"Химия":{"grade":69,"pupils":9},"Литература":{"grade":68,"pupils":1},"Английский":{"grade":74,"pupils":50},"Математика":{"grade":79,"pupils":352},"Информатика":{"grade":72,"pupils":144},"География":{"grade":78,"pupils":4},"Русский":{"grade":82,"pupils":352}},"pupils":1159},{"universities":{"МИСИС":0.030303030303030304,"МИМЭМО":0.030303030303030304,"МГТУ имени Баумана":0.06060606060606061,"МГУ":0.3939393939393939,"МГППУ":0.06060606060606061},"name":"Школа №1980","gia":{"Физика":{"grade":3.4,"pupils":11},"Обществознание":{"grade":3.8,"pupils":27},"История":{"grade":3.7,"pupils":3},"Биология":{"grade":3.6,"pupils":15},"Химия":{"grade":4.1,"pupils":16},"Математика":{"grade":3.6,"pupils":167},"Английский":{"grade":4.1,"pupils":17},"Литература":{"grade":3.6,"pupils":8},"Информатика":{"grade":4.2,"pupils":9},"География":{"grade":3.8,"pupils":4},"Русский":{"grade":3.9,"pupils":167}},"year":2015,"report":"http://sch1980uz.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.535218,"longitude":37.539302},"ege":{},"pupils":2600},{"universities":{"Финансовый университет":0.05714285714285714,"ВУ МО РФ":0.02857142857142857,"РАНХиГС при Президенте РФ":0.04285714285714286,"МГУ":0.44285714285714284,"МГИМО":0.04285714285714286},"name":"Гимназия №1520 имени Капцовых","gia":{"Физика":{"grade":3.7,"pupils":3},"Обществознание":{"grade":3.8,"pupils":22},"Биология":{"grade":4.4,"pupils":5},"Химия":{"grade":4.6,"pupils":5},"Математика":{"grade":4.3,"pupils":71},"Английский":{"grade":4.6,"pupils":68},"Литература":{"grade":5,"pupils":2},"Информатика":{"grade":4,"pupils":3},"География":{"grade":4,"pupils":1},"Немецкий":{"grade":5,"pupils":1},"Русский":{"grade":4.5,"pupils":71}},"year":2015,"report":"http://st.educom.ru//eduoffices/gateways/get_file.php?id={1831164E-310E-44AA-8E68-9211CD855FFD}&name=samoobsledovanie_14-15.pdf","coordinates":{"latitude":55.760631,"longitude":37.604906},"ege":{"Физика":{"grade":61,"pupils":11},"Обществознание":{"grade":71,"pupils":29},"История":{"grade":60,"pupils":15},"Биология":{"grade":72,"pupils":14},"Английский":{"grade":83,"pupils":48},"Химия":{"grade":68,"pupils":15},"Литература":{"grade":63,"pupils":10},"Французский":{"grade":97,"pupils":2},"Математика":{"grade":54,"pupils":47},"Информатика":{"grade":70,"pupils":1},"География":{"grade":89,"pupils":1},"Немецкий":{"grade":61,"pupils":1},"Русский":{"grade":78,"pupils":82}},"pupils":844},{"universities":{"МИРЭА":0.08333333333333333,"ГУУ":0.08333333333333333,"МГУ":0.5,"АГПС МЧС России":0.16666666666666666,"АПИ при ИГиП РАН":0.08333333333333333},"name":"Школа №2098 ","gia":{"Физика":{"grade":3.7,"pupils":19},"Обществознание":{"grade":3.7,"pupils":67},"История":{"grade":3.6,"pupils":5},"Биология":{"grade":3.5,"pupils":15},"Английский":{"grade":4.4,"pupils":32},"Химия":{"grade":4.1,"pupils":16},"Математика":{"grade":3.8,"pupils":147},"Французский":{"grade":3,"pupils":1},"Литература":{"grade":3,"pupils":1},"Информатика":{"grade":4.1,"pupils":51},"География":{"grade":3.8,"pupils":46},"Русский":{"grade":4.1,"pupils":148}},"year":2015,"report":"http://sch2098s.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202098%20-%202014-15%281%29.pdf","coordinates":{"latitude":55.874339,"longitude":37.519306},"ege":{},"pupils":1663},{"universities":{},"name":"Технологии обучения","gia":{"Английский":{"grade":4,"pupils":1},"Литература":{"grade":3,"pupils":1},"Русский":{"grade":4,"pupils":29},"География":{"grade":4,"pupils":1},"Математика":{"grade":3.5,"pupils":15}},"year":2015,"report":"http://cotg.mskobr.ru/files/publichn_otchet_14-15.pdf","coordinates":{"latitude":55.741161,"longitude":37.550073},"ege":{},"pupils":740},{"universities":{"МГАВМиБ имени Скрябина":0.030303030303030304,"Финансовый университет":0.09090909090909091,"Первый МГМУ имени Сеченова":0.030303030303030304,"Гуманитарный институт":0.030303030303030304,"МГУ":0.4090909090909091},"name":"Гимназия на Юго-Востоке","gia":{"Физика":{"grade":3.8,"pupils":5},"Обществознание":{"grade":4.1,"pupils":11},"История":{"grade":3,"pupils":1},"Биология":{"grade":4.3,"pupils":4},"Английский":{"grade":4.6,"pupils":54},"Химия":{"grade":4.8,"pupils":5},"Французский":{"grade":3.7,"pupils":3},"Математика":{"grade":3.4,"pupils":103},"Информатика":{"grade":3.8,"pupils":12},"Русский":{"grade":3.7,"pupils":104}},"year":2015,"report":"http://lgkuv.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%201599.pptx","coordinates":{"latitude":55.711584,"longitude":37.766738},"ege":{"Физика":{"grade":65,"pupils":11},"Обществознание":{"grade":73,"pupils":38},"История":{"grade":71,"pupils":10},"Биология":{"grade":61,"pupils":14},"Химия":{"grade":61,"pupils":11},"Литература":{"grade":73,"pupils":6},"Английский":{"grade":82,"pupils":38},"Математика":{"grade":58,"pupils":57},"Информатика":{"grade":62,"pupils":12},"Русский":{"grade":80,"pupils":77}},"pupils":1868},{"universities":{"Финансовый университет":0.04878048780487805,"МГТУ МИРЭА":0.04878048780487805,"РЭУ имени Плеханова":0.04878048780487805,"МГУ":0.3902439024390244,"МГТУ имени Баумана":0.04878048780487805},"name":"Школа №2031","gia":{"Физика":{"grade":4,"pupils":4},"Обществознание":{"grade":3.8,"pupils":16},"История":{"grade":3,"pupils":1},"Биология":{"grade":3,"pupils":2},"Химия":{"grade":4,"pupils":1},"Английский":{"grade":3.7,"pupils":7},"Математика":{"grade":3.6,"pupils":75},"Информатика":{"grade":4.2,"pupils":13},"География":{"grade":2,"pupils":1},"Русский":{"grade":3.6,"pupils":75}},"year":2014,"report":"http://sch2031.mskobr.ru/files/%20%D0%BE%D1%82%D1%87%D0%B5%D1%82%202013-2014_%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D1%8B%D0%B9.pptx","coordinates":{"latitude":55.710088,"longitude":37.89084},"ege":{},"pupils":1260},{"universities":{"ГИТИС":0.043478260869565216,"РАНХиГС при Президенте РФ":0.08695652173913043,"МГУ":0.3695652173913043,"НИЯУ МИФИ":0.043478260869565216,"МГУДТ":0.043478260869565216},"name":"Гимназия №1552","gia":{"Физика":{"grade":3.9,"pupils":14},"Обществознание":{"grade":3.6,"pupils":22},"История":{"grade":2.9,"pupils":7},"Биология":{"grade":4,"pupils":10},"Английский":{"grade":4.5,"pupils":16},"Химия":{"grade":4.1,"pupils":9},"Математика":{"grade":3.5,"pupils":113},"Французский":{"grade":5,"pupils":1},"Литература":{"grade":3.8,"pupils":4},"Информатика":{"grade":4.5,"pupils":12},"География":{"grade":4.2,"pupils":6},"Немецкий":{"grade":3,"pupils":1},"Русский":{"grade":3.9,"pupils":113}},"year":2015,"report":"http://gymu1552.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202015.pdf","coordinates":{"latitude":55.619605,"longitude":37.746588},"ege":{},"pupils":2220},{"universities":{"МГПУ":0.03225806451612903,"МИИТ":0.03225806451612903,"МГУ":0.3064516129032258,"НИУ ВШЭ":0.04838709677419355,"МАИ":0.06451612903225806},"name":"Школа №1413","gia":{"Физика":{"grade":3.3,"pupils":9},"Обществознание":{"grade":3.5,"pupils":90},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":3.8,"pupils":22},"Химия":{"grade":4.1,"pupils":7},"Английский":{"grade":4,"pupils":70},"Математика":{"grade":3.6,"pupils":183},"Информатика":{"grade":3.9,"pupils":12},"Русский":{"grade":4,"pupils":183}},"year":2015,"report":"http://sch1413sv.mskobr.ru/files/Publ_doc_2014-2015.pdf","coordinates":{"latitude":55.896842,"longitude":37.61759},"ege":{},"pupils":2520},{"universities":{"МПГУ":0.08108108108108109,"МЭСИ":0.02702702702702703,"РНИМУ имени Пирогова":0.05405405405405406,"МГУ":0.32432432432432434,"ВАВТ":0.02702702702702703},"name":"Школа №814","gia":{"Физика":{"grade":3.6,"pupils":11},"Обществознание":{"grade":3.7,"pupils":91},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.6,"pupils":17},"Химия":{"grade":4.4,"pupils":5},"Математика":{"grade":3.5,"pupils":229},"Английский":{"grade":4,"pupils":22},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.2,"pupils":21},"География":{"grade":4.1,"pupils":12},"Русский":{"grade":3.8,"pupils":226}},"year":2013,"report":"http://sch814z.mskobr.ru/files/itogi12-13.pdf","coordinates":{"latitude":55.706543,"longitude":37.474731},"ege":{"Физика":{"grade":69,"pupils":null},"Обществознание":{"grade":69,"pupils":null},"История":{"grade":64,"pupils":null},"Биология":{"grade":72,"pupils":null},"Химия":{"grade":79,"pupils":null},"Литература":{"grade":65,"pupils":null},"Английский":{"grade":90,"pupils":null},"Математика":{"grade":61,"pupils":null},"Информатика":{"grade":57,"pupils":null},"География":{"grade":97,"pupils":null},"Немецкий":{"grade":62,"pupils":null},"Русский":{"grade":78,"pupils":null}},"pupils":4902},{"universities":{"ИСИ":0.06451612903225806,"МЭСИ":0.0967741935483871,"РЭУ имени Плеханова":0.06451612903225806,"МГУ":0.1935483870967742,"РГАУ-МСХА имени Тимирязева":0.06451612903225806},"name":"Школа №1440","gia":{"Обществознание":{"grade":4.5,"pupils":13},"Биология":{"grade":4.3,"pupils":3},"Английский":{"grade":4.7,"pupils":48},"Химия":{"grade":4,"pupils":1},"Математика":{"grade":4.1,"pupils":77},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":5,"pupils":2},"Информатика":{"grade":4.5,"pupils":2},"Русский":{"grade":4.6,"pupils":76}},"year":2015,"report":"http://sch1440.mskobr.ru/report/","coordinates":{"latitude":55.757536,"longitude":37.412721},"ege":{},"pupils":940},{"universities":{"РГГУ":0.07142857142857142,"Финансовый университет":0.05357142857142857,"РАНХиГС при Президенте РФ":0.07142857142857142,"МГУ":0.30357142857142855,"РУДН":0.03571428571428571},"name":"Школа №1245","gia":{"Физика":{"grade":3.9,"pupils":13},"Обществознание":{"grade":4.1,"pupils":17},"История":{"grade":3,"pupils":1},"Биология":{"grade":4.1,"pupils":7},"Химия":{"grade":4.3,"pupils":4},"Математика":{"grade":3.6,"pupils":160},"Английский":{"grade":4.3,"pupils":38},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.6,"pupils":15},"География":{"grade":4.3,"pupils":4},"Русский":{"grade":4,"pupils":160}},"year":2014,"report":"http://sch1245u.mskobr.ru/files/2014_%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.599336,"longitude":37.59374},"ege":{},"pupils":2220},{"universities":{},"name":"Школа №2090","gia":{"Физика":{"grade":3.7,"pupils":10},"Обществознание":{"grade":3.6,"pupils":63},"История":{"grade":3.5,"pupils":4},"Биология":{"grade":3.4,"pupils":16},"Химия":{"grade":3.8,"pupils":11},"Математика":{"grade":3.6,"pupils":140},"Английский":{"grade":3.9,"pupils":14},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4,"pupils":16},"География":{"grade":3.7,"pupils":3},"Русский":{"grade":3.8,"pupils":141}},"year":2014,"report":"http://sch2090uv.mskobr.ru/report/","coordinates":{"latitude":55.714389,"longitude":37.792411},"ege":{},"pupils":1960},{"universities":{"РГГУ":0.023809523809523808,"Финансовый университет":0.07142857142857142,"Первый МГМУ имени Сеченова":0.023809523809523808,"МГУ":0.36904761904761907,"РГСУ":0.023809523809523808},"name":"Школа №947","gia":{"Физика":{"grade":4.1,"pupils":13},"Обществознание":{"grade":3.8,"pupils":38},"История":{"grade":3,"pupils":1},"Биология":{"grade":3.9,"pupils":16},"Химия":{"grade":4.2,"pupils":13},"Математика":{"grade":3.6,"pupils":208},"Английский":{"grade":4.1,"pupils":22},"Литература":{"grade":4,"pupils":3},"Информатика":{"grade":4.3,"pupils":12},"География":{"grade":4,"pupils":2},"Русский":{"grade":3.9,"pupils":208}},"year":2014,"report":"http://sch947u.mskobr.ru/files/%20%28%D0%BD%D0%B0%D1%88%29%20%28%D0%B2%D0%B0%D1%80%29.pdf","coordinates":{"latitude":55.58497,"longitude":37.674552},"ege":{},"pupils":1880},{"universities":{"МЭСИ":0.038461538461538464,"РАНХиГС при Президенте РФ":0.038461538461538464,"МГУ":0.4230769230769231,"НИУ ВШЭ":0.07692307692307693,"МГТУ имени Баумана":0.038461538461538464},"name":"Лицей №1533","gia":{"Физика":{"grade":4.2,"pupils":35},"Обществознание":{"grade":4.1,"pupils":9},"Химия":{"grade":4,"pupils":20},"Математика":{"grade":4.9,"pupils":142},"Английский":{"grade":4.7,"pupils":73},"Литература":{"grade":5,"pupils":1},"Информатика":{"grade":4.6,"pupils":7},"География":{"grade":4.2,"pupils":6},"Русский":{"grade":4.7,"pupils":142}},"year":2015,"report":"http://lyc1533.mskobr.ru/files/%D0%9F%D1%83%D0%B1%D0%BB%D0%B8%D1%87%D0%BD%D1%8B%D0%B9%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4%202014%E2%80%932015.pdf","coordinates":{"latitude":55.692338,"longitude":37.543731},"ege":{"Физика":{"grade":71,"pupils":null},"Обществознание":{"grade":64,"pupils":null},"История":{"grade":55,"pupils":null},"Биология":{"grade":72,"pupils":null},"Химия":{"grade":56,"pupils":null},"Литература":{"grade":65,"pupils":null},"Английский":{"grade":81,"pupils":null},"Математика":{"grade":75,"pupils":null},"Информатика":{"grade":68,"pupils":null},"Русский":{"grade":83,"pupils":null}},"pupils":861},{"universities":{"МГАВМиБ имени Скрябина":0.024390243902439025,"РЭУ имени Плеханова":0.04878048780487805,"РАНХиГС при Президенте РФ":0.04878048780487805,"МГУ":0.4878048780487805,"РУДН":0.04878048780487805},"name":"Школа №1191","gia":{"Физика":{"grade":3.2,"pupils":10},"Обществознание":{"grade":3.4,"pupils":19},"История":{"grade":4.3,"pupils":3},"Биология":{"grade":3.7,"pupils":14},"Химия":{"grade":3.8,"pupils":20},"Математика":{"grade":3.5,"pupils":155},"Английский":{"grade":3.8,"pupils":15},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":3.8,"pupils":9},"Русский":{"grade":3.6,"pupils":152}},"year":2014,"report":"http://sch1191sz.mskobr.ru/files/2014-2015_god/Publichniy_doklad_2014.docx","coordinates":{"latitude":55.850737,"longitude":37.357708},"ege":{},"pupils":2760},{"universities":{},"name":"Школа №2104 на Таганке","gia":{"Физика":{"grade":3.8,"pupils":16},"Обществознание":{"grade":3.7,"pupils":60},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4,"pupils":3},"Химия":{"grade":4.5,"pupils":6},"Математика":{"grade":4.1,"pupils":137},"Английский":{"grade":4.1,"pupils":35},"Литература":{"grade":4.3,"pupils":4},"Информатика":{"grade":4.6,"pupils":37},"География":{"grade":3.8,"pupils":16},"Немецкий":{"grade":4.1,"pupils":21},"Русский":{"grade":4.4,"pupils":137}},"year":2015,"report":"http://sch2104c.mskobr.ru/files/%20%D0%B4%D0%BE%D0%BA%D0%BB%D0%B0%D0%B4.pdf","coordinates":{"latitude":55.743613,"longitude":37.646345},"ege":{"Физика":{"grade":58,"pupils":null},"Обществознание":{"grade":65,"pupils":null},"История":{"grade":56,"pupils":null},"Биология":{"grade":72,"pupils":null},"Химия":{"grade":63,"pupils":null},"Литература":{"grade":66,"pupils":null},"Английский":{"grade":69,"pupils":null},"Математика":{"grade":56,"pupils":null},"Информатика":{"grade":61,"pupils":null},"Немецкий":{"grade":77,"pupils":null},"Русский":{"grade":79,"pupils":null}},"pupils":1212},{"universities":{"РГГУ":0.047619047619047616,"МГИМО":0.07142857142857142,"МГУ":0.5,"НИУ ВШЭ":0.047619047619047616,"МГУПП":0.047619047619047616},"name":"Гимназия №1290","gia":{"Физика":{"grade":4.1,"pupils":9},"Обществознание":{"grade":3.8,"pupils":9},"История":{"grade":5,"pupils":1},"Биология":{"grade":4.1,"pupils":8},"Английский":{"grade":4.5,"pupils":21},"Химия":{"grade":4,"pupils":4},"Математика":{"grade":3.6,"pupils":167},"Французский":{"grade":4,"pupils":1},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4.4,"pupils":8},"География":{"grade":4,"pupils":1},"Русский":{"grade":4,"pupils":167}},"year":2015,"report":"http://gym1290.mskobr.ru/files/pd_1415_1.pdf","coordinates":{"latitude":55.794457,"longitude":37.793462},"ege":{},"pupils":2090},{"universities":{"МГИМО":0.05405405405405406,"Первый МГМУ имени Сеченова":0.08108108108108109,"РАНХиГС при Президенте РФ":0.05405405405405406,"МГУ":0.2702702702702703,"РХТУ имени Менделеева":0.05405405405405406},"name":"Школа №1298","gia":{"Физика":{"grade":3.8,"pupils":5},"Обществознание":{"grade":4.2,"pupils":12},"Биология":{"grade":4.2,"pupils":5},"Химия":{"grade":4.3,"pupils":11},"Математика":{"grade":4.2,"pupils":87},"Английский":{"grade":4.7,"pupils":57},"Литература":{"grade":4.5,"pupils":2},"Информатика":{"grade":4,"pupils":1},"География":{"grade":4.8,"pupils":5},"Немецкий":{"grade":4,"pupils":1},"Русский":{"grade":4.5,"pupils":87}},"year":2014,"report":"http://sch1298sz.mskobr.ru/files/public_report_2014.pdf","coordinates":{"latitude":55.900128,"longitude":37.382393},"ege":{},"pupils":1100},{"universities":{"МИИТ":0.030303030303030304,"Финансовый университет":0.06060606060606061,"РАНХиГС при Президенте РФ":0.045454545454545456,"МГУ":0.30303030303030304,"МГИМО":0.06060606060606061},"name":"Школа №1239","gia":{"Физика":{"grade":4,"pupils":1},"Обществознание":{"grade":4.3,"pupils":17},"История":{"grade":4,"pupils":1},"Биология":{"grade":4,"pupils":1},"Химия":{"grade":4.3,"pupils":4},"Математика":{"grade":4.1,"pupils":92},"Английский":{"grade":4.7,"pupils":75},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":5,"pupils":1},"География":{"grade":4,"pupils":2},"Русский":{"grade":4.3,"pupils":92}},"year":2015,"report":"http://coc1239.mskobr.ru/files/20142015_otchet_o_realizacii_programmy_razvitiya_2_e_tap.doc","coordinates":{"latitude":55.760292,"longitude":37.588808},"ege":{},"pupils":1540},{"universities":{"ВАВТ":0.044444444444444446,"Финансовый университет":0.06666666666666667,"РАНХиГС при Президенте РФ":0.06666666666666667,"МГУ":0.37777777777777777,"НИУ ВШЭ":0.06666666666666667},"name":"Государственная столичная гимназия","gia":{},"year":2015,"report":"http://gsg.mskobr.ru/files/Publ_doklad_2015%281%29.pdf","coordinates":{"latitude":55.895615,"longitude":37.616207},"ege":{"Физика":{"grade":61,"pupils":36},"Обществознание":{"grade":58,"pupils":86},"История":{"grade":53,"pupils":26},"Биология":{"grade":61,"pupils":16},"Химия":{"grade":68,"pupils":13},"Литература":{"grade":71,"pupils":10},"Английский":{"grade":79,"pupils":38},"Математика":{"grade":52,"pupils":108},"Информатика":{"grade":63,"pupils":22},"География":{"grade":65,"pupils":6},"Немецкий":{"grade":80,"pupils":7},"Русский":{"grade":72,"pupils":145}},"pupils":4088},{"universities":{"Финансовый университет":0.025,"ГУМФ":0.05,"МГУ":0.5,"ГУУ":0.05,"АГПС МЧС России":0.05},"name":"Школа №1357 ","gia":{"Физика":{"grade":4.4,"pupils":13},"Обществознание":{"grade":3.8,"pupils":40},"История":{"grade":3.5,"pupils":2},"Биология":{"grade":4,"pupils":22},"Химия":{"grade":4.4,"pupils":22},"Математика":{"grade":3.8,"pupils":126},"Английский":{"grade":4.4,"pupils":26},"Литература":{"grade":4,"pupils":2},"Информатика":{"grade":4.5,"pupils":13},"География":{"grade":4,"pupils":5},"Русский":{"grade":4.2,"pupils":126}},"year":2015,"report":"http://sch1357uv.mskobr.ru/files/%20%D0%94%D0%9E%D0%9A%D0%9B%D0%90%D0%94%20%D0%94%D0%98%D0%A0%D0%95%D0%9A%D0%A2%D0%9E%D0%A0%D0%90%20%D0%93%D0%91%D0%9E%D0%A3%20%D0%A1%D0%9E%D0%A8%20%E2%84%961357%281%29.docx","coordinates":{"latitude":55.659805,"longitude":37.763477},"ege":{"Физика":{"grade":63,"pupils":null},"Обществознание":{"grade":58,"pupils":null},"Биология":{"grade":71,"pupils":null},"Химия":{"grade":81,"pupils":null},"Литература":{"grade":51,"pupils":null},"Английский":{"grade":70,"pupils":null},"Математика":{"grade":54,"pupils":null},"Информатика":{"grade":59,"pupils":null},"География":{"grade":69,"pupils":null},"Русский":{"grade":77,"pupils":null}},"pupils":1650},{"universities":{"МПГУ":0.03278688524590164,"РЭУ имени Плеханова":0.04918032786885246,"МГПУ":0.03278688524590164,"МГУ":0.39344262295081966,"РГСУ":0.03278688524590164},"name":"Школа №709","gia":{"Физика":{"grade":5,"pupils":2},"Обществознание":{"grade":3.7,"pupils":3},"Английский":{"grade":3.8,"pupils":13},"Математика":{"grade":3.3,"pupils":73},"Информатика":{"grade":4.8,"pupils":5},"География":{"grade":4,"pupils":1},"Русский":{"grade":3.8,"pupils":73}},"year":2015,"report":"http://sch709sv.mskobr.ru/files/publichnyj_doklad_2014_2015_god_709.docx","coordinates":{"latitude":55.935113,"longitude":37.556307},"ege":{},"pupils":800},{"universities":{"МЭИ":0.3953488372093023,"РАНХиГС при Президенте РФ":0.023255813953488372,"МГУ":0.14534883720930233,"НИУ ВШЭ":0.029069767441860465,"МГТУ имени Баумана":0.10465116279069768},"name":"Лицей №1502 при МЭИ","gia":{},"year":2015,"report":"http://lycg1502.mskobr.ru/files/pdf/public_report_2014_15.pdf.pdf","coordinates":{"latitude":55.760282,"longitude":37.830204},"ege":{"Математика":{"grade":62,"pupils":null},"Русский":{"grade":81,"pupils":null}},"pupils":1654},{"universities":{"МГСУ НИУ":0.06382978723404255,"Финансовый университет":0.02127659574468085,"АУ МВД РФ":0.0425531914893617,"МГУ":0.2978723404255319,"РУДН":0.0425531914893617},"name":"Школа №1499 имени Докукина","gia":{"Физика":{"grade":3,"pupils":1},"Обществознание":{"grade":3,"pupils":1},"Биология":{"grade":3,"pupils":1},"Химия":{"grade":4,"pupils":4},"Математика":{"grade":3.9,"pupils":28},"Английский":{"grade":4,"pupils":1},"Литература":{"grade":3,"pupils":1},"Русский":{"grade":3.9,"pupils":28}},"year":2014,"report":"http://co1499sv-new.mskobr.ru/report/","coordinates":{"latitude":55.835447,"longitude":37.661024},"ege":{},"pupils":1060}];
 
 /***/ }
 /******/ ]);
